@@ -1,0 +1,377 @@
+/* Tactical, minimal styling - neutral colors, clean interface */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+  line-height: 1.6;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Header */
+.header {
+  background-color: #2c3e50;
+  padding: 20px;
+  margin-bottom: 30px;
+  border-left: 4px solid #3498db;
+}
+
+.header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #ecf0f1;
+}
+
+.header p {
+  font-size: 14px;
+  color: #95a5a6;
+}
+
+/* Stats Bar */
+.stats-bar {
+  background-color: #34495e;
+  padding: 15px 20px;
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 4px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #bdc3c7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #3498db;
+  margin-top: 2px;
+}
+
+/* Main Content */
+.main-content {
+  display: grid;
+  grid-template-columns: 450px 1fr;
+  gap: 30px;
+}
+
+/* Input Panel */
+.input-panel {
+  background-color: #2c3e50;
+  padding: 25px;
+  border-radius: 4px;
+  height: fit-content;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #ecf0f1;
+  border-bottom: 1px solid #34495e;
+  padding-bottom: 10px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #bdc3c7;
+}
+
+.form-group select,
+.form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  background-color: #34495e;
+  border: 1px solid #4a5f7f;
+  color: #ecf0f1;
+  font-size: 14px;
+  border-radius: 3px;
+  transition: border-color 0.2s;
+}
+
+.form-group select:focus,
+.form-group input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.form-group input::placeholder {
+  color: #7f8c8d;
+}
+
+.form-group small {
+  display: block;
+  font-size: 11px;
+  color: #95a5a6;
+  margin-top: 4px;
+}
+
+.api-indicator {
+  background-color: #34495e;
+  padding: 12px;
+  border-radius: 3px;
+  margin-bottom: 20px;
+  border-left: 3px solid #3498db;
+}
+
+.api-indicator strong {
+  color: #3498db;
+  font-size: 13px;
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 3px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary {
+  background-color: #3498db;
+  color: white;
+  width: 100%;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+.btn-primary:disabled {
+  background-color: #4a5f7f;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-secondary {
+  background-color: #34495e;
+  color: #ecf0f1;
+  margin-right: 10px;
+}
+
+.btn-secondary:hover {
+  background-color: #4a5f7f;
+}
+
+/* Results Panel */
+.results-panel {
+  background-color: #2c3e50;
+  padding: 25px;
+  border-radius: 4px;
+  min-height: 400px;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #34495e;
+  padding-bottom: 10px;
+}
+
+.results-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.btn-export {
+  padding: 8px 16px;
+  background-color: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-export:hover {
+  background-color: #229954;
+}
+
+/* Loading State */
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: #bdc3c7;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #34495e;
+  border-top-color: #3498db;
+  border-radius: 50%;
+  margin: 0 auto 15px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: #7f8c8d;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+  opacity: 0.3;
+}
+
+/* Error State */
+.error-state {
+  background-color: #c0392b;
+  color: white;
+  padding: 15px;
+  border-radius: 3px;
+  margin-bottom: 20px;
+}
+
+.error-state strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+/* Results Table */
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.results-table th,
+.results-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #34495e;
+}
+
+.results-table th {
+  background-color: #34495e;
+  color: #ecf0f1;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.results-table td {
+  color: #ecf0f1;
+  font-size: 13px;
+}
+
+.results-table tr:hover {
+  background-color: #34495e;
+}
+
+/* JSON View */
+.json-view {
+  background-color: #1a1a1a;
+  padding: 20px;
+  border-radius: 3px;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ecf0f1;
+}
+
+.json-view pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* View Toggle */
+.view-toggle {
+  display: flex;
+  gap: 5px;
+  background-color: #34495e;
+  padding: 4px;
+  border-radius: 3px;
+  width: fit-content;
+}
+
+.view-toggle button {
+  padding: 6px 14px;
+  background-color: transparent;
+  color: #95a5a6;
+  border: none;
+  border-radius: 2px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-toggle button.active {
+  background-color: #3498db;
+  color: white;
+}
+
+/* Metadata */
+.metadata {
+  background-color: #34495e;
+  padding: 12px;
+  border-radius: 3px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  color: #bdc3c7;
+}
+
+.metadata strong {
+  color: #ecf0f1;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .main-content {
+    grid-template-columns: 1fr;
+  }
+}
