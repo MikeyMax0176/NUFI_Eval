@@ -46,23 +46,81 @@ function ResultsPanel({ results, error, loading, selectedApi }) {
       enrichmentByPhone: 'Enrichment_Phone',
       enrichmentByEmail: 'Enrichment_Email',
       enrichmentByName: 'Enrichment_Name',
-      profilingPhone: 'Profiling_Phone',
-      profilingEmail: 'Profiling_Email',
       renapo: 'Renapo_CURP'
     };
     const apiName = apiNameMap[selectedApi] || 'NUFI';
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `NUFI_${apiName}_${timestamp}`;
+    
+    // Extract the search value (phone, email, or name) for the filename
+    let searchIdentifier = '';
+    
+    // Try to get from query data first
+    if (results.data && results.data.query) {
+      // Check for phone numbers
+      if (results.data.query.phones && results.data.query.phones.length > 0) {
+        searchIdentifier = results.data.query.phones[0].number || results.data.query.phones[0].raw;
+      }
+      // Check for emails
+      else if (results.data.query.emails && results.data.query.emails.length > 0) {
+        searchIdentifier = results.data.query.emails[0].address || results.data.query.emails[0];
+      }
+      // Check for names
+      else if (results.data.query.names && results.data.query.names.length > 0) {
+        const name = results.data.query.names[0];
+        searchIdentifier = name.display || `${name.first || ''}_${name.last || ''}`.replace(/__/g, '_');
+      }
+      // Direct email or phone in query
+      else if (results.data.query.email) {
+        searchIdentifier = results.data.query.email;
+      }
+      else if (results.data.query.phone) {
+        searchIdentifier = results.data.query.phone;
+      }
+    }
+    
+    // Fallback: extract from top-level data fields
+    if (!searchIdentifier && results.data) {
+      searchIdentifier = results.data.phone || 
+                       results.data.telefono || 
+                       results.data.celular ||
+                       results.data.correo ||
+                       results.data.email ||
+                       results.data.curp ||
+                       results.data.rfc ||
+                       '';
+      
+      // Try to get name if nothing else found
+      if (!searchIdentifier && results.data.nombre) {
+        searchIdentifier = `${results.data.nombre || ''}_${results.data.apellidoPaterno || ''}`.replace(/__/g, '_');
+      }
+    }
+    
+    // Clean identifier for filename (remove special characters)
+    searchIdentifier = String(searchIdentifier)
+      .trim()
+      .replace(/[^a-zA-Z0-9@._-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+    
+    // Create filename: use search identifier as the main filename
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = searchIdentifier || `${apiName}_${timestamp}`;
+
+    // Extract phone number for document metadata (if applicable)
+    let phoneNumber = '';
+    if (results.data && results.data.query && results.data.query.phones && results.data.query.phones.length > 0) {
+      phoneNumber = results.data.query.phones[0].number || results.data.query.phones[0].raw || '';
+      phoneNumber = phoneNumber.replace(/\D/g, '');
+    }
 
     switch (format) {
       case 'csv':
-        exportToCSV(results, filename); // Now passing full results for comprehensive export
+        exportToCSV(results, filename);
         break;
       case 'json':
         exportToJSON(results, filename);
         break;
       case 'doc':
-        exportToDOC(results, filename, apiName);
+        exportToDOC(results, filename, apiName, phoneNumber);
         break;
       default:
         break;

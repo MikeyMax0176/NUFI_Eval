@@ -41,9 +41,10 @@
 }
 
 .section-title {
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 15px;
   color: #ecf0f1;
+  letter-spacing: -0.2px;
 }
 
 .section-content {
@@ -76,14 +77,15 @@
 .field-key {
   font-weight: 600;
   color: #3498db;
-  font-size: 13px;
+  font-size: 14px;
   word-break: break-word;
 }
 
 .field-value {
   color: #ecf0f1;
-  font-size: 13px;
+  font-size: 14px;
   word-break: break-word;
+  line-height: 1.5;
 }
 
 /* Array Rendering */
@@ -429,6 +431,12 @@
   font-size: 15px;
   color: #ecf0f1;
   font-weight: 500;
+
+.dossier-item-subvalue {
+  font-size: 11px;
+  color: #bdc3c7;
+  margin-top: 4px;
+}
 }
 
 /* Entry (Jobs/Education) */

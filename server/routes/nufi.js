@@ -6,9 +6,10 @@ const {
   enrichmentByPhone,
   enrichmentByEmail,
   enrichmentByName,
+  renapo,
   profilingPhone,
   profilingEmail,
-  renapo
+  curpCalculation
 } = require('../services/nufiService');
 
 // General Data Enrichment endpoint
@@ -81,7 +82,21 @@ router.post('/enrichment/name', async (req, res, next) => {
   }
 });
 
-// Contact Profiling by Phone endpoint
+// RENAPO CURP Validation endpoint
+router.post('/renapo/curp', async (req, res, next) => {
+  try {
+    const result = await renapo(req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({
+      success: false,
+      error: error.error || error.message,
+      details: error.details
+    });
+  }
+});
+
+// Phone Profiling endpoint
 router.post('/profiling/phone', async (req, res, next) => {
   try {
     const result = await profilingPhone(req.body);
@@ -95,7 +110,7 @@ router.post('/profiling/phone', async (req, res, next) => {
   }
 });
 
-// Contact Profiling by Email endpoint
+// Email Profiling endpoint
 router.post('/profiling/email', async (req, res, next) => {
   try {
     const result = await profilingEmail(req.body);
@@ -109,10 +124,10 @@ router.post('/profiling/email', async (req, res, next) => {
   }
 });
 
-// RENAPO CURP Validation endpoint
-router.post('/renapo/curp', async (req, res, next) => {
+// CURP Calculation/Validation endpoint
+router.post('/curp/calculate', async (req, res, next) => {
   try {
-    const result = await renapo(req.body);
+    const result = await curpCalculation(req.body);
     res.json(result);
   } catch (error) {
     res.status(error.status || 500).json({

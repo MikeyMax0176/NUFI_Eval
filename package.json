@@ -1,15 +1,17 @@
 {
-  "name": "nufi-eval",
+  "name": "guardian-fusion",
   "version": "1.0.0",
-  "description": "Internal testing GUI for NUFI API",
+  "description": "Guardian Fusion - Data Intelligence Platform for NUFI API",
   "scripts": {
     "install-all": "npm install && cd client && npm install && cd ../server && npm install",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && npm run dev",
     "client": "cd client && npm start",
-    "build": "cd client && npm run build"
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start",
+    "production": "NODE_ENV=production npm run start"
   },
-  "keywords": ["nufi", "api", "testing", "gui"],
+  "keywords": ["nufi", "api", "data-intelligence", "guardian-fusion"],
   "author": "",
   "license": "ISC",
   "devDependencies": {

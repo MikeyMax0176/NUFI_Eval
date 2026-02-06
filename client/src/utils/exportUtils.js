@@ -12,11 +12,22 @@
 /**
  * Flatten nested object for CSV export
  * Now handles deep nesting and creates multiple rows for arrays of objects
+ * Removes internal fields like @search_pointer
  */
 const flattenObject = (obj, prefix = '') => {
   let result = {};
   
   for (const [key, value] of Object.entries(obj)) {
+    // Skip internal/metadata fields
+    if (key === '@search_pointer' || 
+        key === 'search_pointer' || 
+        key.endsWith('_md5') || 
+        key === '@inferred' ||
+        key === '@id' ||
+        key === 'metadata') {
+      continue;
+    }
+    
     if (value === null || value === undefined) {
       continue; // Skip null/undefined but preserve empty strings
     }
@@ -46,12 +57,13 @@ const flattenObject = (obj, prefix = '') => {
 
 /**
  * Export results to CSV format
- * Now includes ALL fields from the response
+ * Now includes ALL fields from the response with clean formatting
  */
 export const exportToCSV = (data, filename) => {
   try {
-    // Flatten the entire response object
-    const flatData = flattenObject(data);
+    // Sanitize then flatten the data
+    const sanitized = sanitizeForExport(data);
+    const flatData = flattenObject(sanitized);
     
     if (Object.keys(flatData).length === 0) {
       alert('No data to export');
@@ -62,10 +74,19 @@ export const exportToCSV = (data, filename) => {
     const headers = Object.keys(flatData);
     const values = Object.values(flatData);
     
-    // Format column names (keep dots for clarity, clean up)
-    const cleanHeaders = headers.map(h => 
-      h.replace(/@/g, 'meta_') // Replace @ with meta_
-    );
+    // Format column names - convert dot notation and clean up
+    const cleanHeaders = headers.map(h => {
+      return h
+        .replace(/@/g, '')  // Remove @ symbols
+        .replace(/\./g, '_') // Replace dots with underscores
+        .replace(/([A-Z])/g, '_$1') // Add underscore before capitals
+        .toLowerCase()
+        .replace(/_+/g, '_') // Remove multiple underscores
+        .replace(/^_|_$/g, '') // Remove leading/trailing underscores
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    });
 
     const csvContent = [
       cleanHeaders.join(','),
@@ -84,11 +105,43 @@ export const exportToCSV = (data, filename) => {
 };
 
 /**
+ * Sanitize data for export - remove internal fields
+ */
+const sanitizeForExport = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForExport(item));
+  }
+  
+  const cleaned = {};
+  for (const [key, value] of Object.entries(obj)) {
+    // Remove internal fields
+    if (key === '@search_pointer' || 
+        key === 'search_pointer' || 
+        key.endsWith('_md5') || 
+        key === '@inferred' ||
+        key === '@id') {
+      continue;
+    }
+    
+    if (value && typeof value === 'object') {
+      cleaned[key] = sanitizeForExport(value);
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  
+  return cleaned;
+};
+
+/**
  * Export results to JSON format
  */
 export const exportToJSON = (data, filename) => {
   try {
-    const jsonContent = JSON.stringify(data, null, 2);
+    const sanitized = sanitizeForExport(data);
+    const jsonContent = JSON.stringify(sanitized, null, 2);
     downloadFile(jsonContent, `${filename}.json`, 'application/json');
   } catch (error) {
     console.error('JSON export error:', error);
@@ -97,129 +150,152 @@ export const exportToJSON = (data, filename) => {
 };
 
 /**
- * Export results to DOC format (HTML-based Word-compatible document)
+ * Format a value for clean display in the document
  */
-export const exportToDOC = (data, filename, apiName) => {
-  try {
-    const flatData = flattenObject(data.data || data);
+const formatValue = (value) => {
+  if (value === null || value === undefined) return '<em style="color: #999;">N/A</em>';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'string') return value || '<em style="color: #999;">Empty</em>';
+  if (typeof value === 'number') return value.toString();
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '<em style="color: #999;">Empty array</em>';
+    if (typeof value[0] === 'object' && value[0] !== null) {
+      // Array of objects - render each as a sub-section
+      return value.map((item, i) => `
+        <div style="margin-left: 20px; margin-top: 10px; padding: 10px; background: #fff; border-left: 3px solid #3498db;">
+          <strong>Item ${i + 1}:</strong><br/>
+          ${Object.entries(item).map(([k, v]) => 
+            `<div style="margin-left: 10px;"><strong>${k}:</strong> ${formatValue(v)}</div>`
+          ).join('')}
+        </div>
+      `).join('');
+    }
+    // Array of primitives
+    return value.join(', ');
+  }
+  if (typeof value === 'object') {
+    // Nested object - render inline
+    return `<div style="margin-left: 15px; margin-top: 5px;">${
+      Object.entries(value).map(([k, v]) => 
+        `<div><strong>${k}:</strong> ${formatValue(v)}</div>`
+      ).join('')
+    }</div>`;
+  }
+  return String(value);
+};
+
+/**
+ * Render a nested object as clean HTML sections
+ */
+const renderObjectSection = (obj, depth = 0) => {
+  if (!obj || typeof obj !== 'object') {
+    return `<p>No data available</p>`;
+  }
+  
+  let html = '';
+  const indent = depth > 0 ? 'margin-left: 20px;' : '';
+  
+  const entries = Object.entries(obj);
+  if (entries.length === 0) {
+    return '<p><em>No data available</em></p>';
+  }
+  
+  for (const [key, value] of entries) {
+    // Skip metadata and internal fields in the data section
+    if (key === 'metadata' || key.startsWith('@')) continue;
     
-    if (Object.keys(flatData).length === 0) {
+    const label = key
+      .replace(/([A-Z])/g, ' $1') // Add space before capitals
+      .replace(/[_-]/g, ' ') // Replace underscores/hyphens with spaces
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+      .trim();
+    
+    if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 3) {
+      // Large nested object - create subsection
+      html += `
+        <div style="${indent}">
+          <h3 style="color: #2c3e50; font-size: 15px; margin-top: 15px; margin-bottom: 10px; border-bottom: 1px solid #e0e0e0; padding-bottom: 5px;">${label}</h3>
+          ${renderObjectSection(value, depth + 1)}
+        </div>`;
+    } else {
+      // Simple field or small object - show as key-value pair
+      const formattedValue = formatValue(value);
+      html += `
+        <div style="${indent} margin-bottom: 10px;">
+          <strong style="color: #2c3e50; display: inline-block; min-width: 150px;">${label}:</strong> 
+          <span style="color: #34495e;">${formattedValue}</span>
+        </div>`;
+    }
+  }
+  
+  return html || '<p><em>No data to display</em></p>';
+};
+
+/**
+ * Export results to DOC format - Professional Word document
+ * Now generates true .docx files with proper styling via server endpoint
+ */
+export const exportToDOC = async (data, filename, apiName, phoneNumber = '') => {
+  try {
+    // Handle different data structures
+    let responseData;
+    if (data.data) {
+      responseData = data;
+    } else if (data.results) {
+      responseData = { data: data.results, metadata: data.metadata };
+    } else {
+      responseData = { data: data };
+    }
+    
+    if (!responseData.data || (typeof responseData.data === 'object' && Object.keys(responseData.data).length === 0)) {
       alert('No data to export');
       return;
     }
 
-    // Create HTML document structure
-    const timestamp = new Date().toLocaleString();
-    const metadata = data.metadata || {};
+    // Call server endpoint to generate professional DOCX
+    const response = await fetch('/api/export/docx', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        data: responseData.data,
+        apiName: apiName || 'NUFI Report',
+        phoneNumber: phoneNumber,
+        metadata: responseData.metadata || {},
+        filename: filename
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.details || error.error || 'Failed to generate document');
+    }
+
+    // Get the blob from response
+    const blob = await response.blob();
     
-    let docContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>NUFI API Report - ${apiName}</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
-      line-height: 1.6;
-    }
-    h1 {
-      color: #2c3e50;
-      border-bottom: 3px solid #3498db;
-      padding-bottom: 10px;
-    }
-    h2 {
-      color: #34495e;
-      margin-top: 30px;
-    }
-    .metadata {
-      background-color: #ecf0f1;
-      padding: 15px;
-      border-left: 4px solid #3498db;
-      margin-bottom: 30px;
-    }
-    .metadata p {
-      margin: 5px 0;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th, td {
-      border: 1px solid #bdc3c7;
-      padding: 12px;
-      text-align: left;
-    }
-    th {
-      background-color: #34495e;
-      color: white;
-      font-weight: bold;
-    }
-    tr:nth-child(even) {
-      background-color: #f8f9fa;
-    }
-    .footer {
-      margin-top: 40px;
-      font-size: 12px;
-      color: #7f8c8d;
-      border-top: 1px solid #bdc3c7;
-      padding-top: 15px;
-    }
-  </style>
-</head>
-<body>
-  <h1>NUFI API Report: ${apiName}</h1>
-  
-  <div class="metadata">
-    <h2>Query Information</h2>
-    <p><strong>Generated:</strong> ${timestamp}</p>
-    ${metadata.endpoint ? `<p><strong>Endpoint:</strong> ${metadata.endpoint}</p>` : ''}
-    ${metadata.paramsUsed ? `<p><strong>Parameters Used:</strong> ${metadata.paramsUsed.join(', ')}</p>` : ''}
-    ${metadata.timestamp ? `<p><strong>API Query Time:</strong> ${new Date(metadata.timestamp).toLocaleString()}</p>` : ''}
-  </div>
+    // Generate filename
+    const timestamp = new Date().toISOString().split('T')[0];
+    const phone = phoneNumber ? `_${phoneNumber}` : '';
+    const docFilename = `${filename || 'NUFI_Report'}_${apiName}${phone}_${timestamp}.docx`;
 
-  <h2>Results</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Field</th>
-        <th>Value</th>
-      </tr>
-    </thead>
-    <tbody>
-`;
+    // Download the file
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = docFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 
-    // Add data rows
-    for (const [key, value] of Object.entries(flatData)) {
-      const cleanKey = key.split(/[._]/)
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-      
-      docContent += `
-      <tr>
-        <td><strong>${cleanKey}</strong></td>
-        <td>${String(value)}</td>
-      </tr>`;
-    }
-
-    docContent += `
-    </tbody>
-  </table>
-
-  <div class="footer">
-    <p>Report generated by NUFI API Testing Interface</p>
-    <p>This document is for internal evaluation and testing purposes only.</p>
-  </div>
-</body>
-</html>`;
-
-    // Download as .doc (HTML-based, opens in Word)
-    downloadFile(docContent, `${filename}.doc`, 'application/msword');
+    console.log(`Successfully exported ${docFilename}`);
   } catch (error) {
     console.error('DOC export error:', error);
-    alert('Failed to export DOC');
+    alert('Failed to export DOC: ' + error.message);
   }
 };
 

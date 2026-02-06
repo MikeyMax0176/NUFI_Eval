@@ -5,11 +5,11 @@ import ResultsPanel from './components/ResultsPanel';
 import StatsBar from './components/StatsBar';
 
 function App() {
-  const [selectedApi, setSelectedApi] = useState('enrichment');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
+  const [lastApiType, setLastApiType] = useState(null);
 
   // Fetch stats on mount and after each request
   const fetchStats = async () => {
@@ -26,25 +26,22 @@ function App() {
     fetchStats();
   }, []);
 
-  const handleSubmit = async (formData) => {
+  const handleSubmit = async (formData, apiType) => {
     setLoading(true);
     setError(null);
     setResults(null);
+    setLastApiType(apiType);
 
     try {
-      // Map API selection to endpoint
+      // Map API type to endpoint
       const endpointMap = {
-        'enrichment': '/api/nufi/enrichment',
-        'blacklist': '/api/nufi/blacklist',
         'enrichmentByPhone': '/api/nufi/enrichment/phone',
         'enrichmentByEmail': '/api/nufi/enrichment/email',
         'enrichmentByName': '/api/nufi/enrichment/name',
-        'profilingPhone': '/api/nufi/profiling/phone',
-        'profilingEmail': '/api/nufi/profiling/email',
         'renapo': '/api/nufi/renapo/curp'
       };
 
-      const endpoint = endpointMap[selectedApi];
+      const endpoint = endpointMap[apiType];
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -83,8 +80,6 @@ function App() {
 
         <div className="main-content">
           <InputPanel
-            selectedApi={selectedApi}
-            onApiChange={setSelectedApi}
             onSubmit={handleSubmit}
             loading={loading}
           />
@@ -93,7 +88,7 @@ function App() {
             results={results}
             error={error}
             loading={loading}
-            selectedApi={selectedApi}
+            selectedApi={lastApiType}
           />
         </div>
       </div>

@@ -1,148 +1,197 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// Field configurations based on NUFI API documentation
-const API_FIELDS = {
-  enrichment: [
-    { name: 'rfc', label: 'RFC (Tax ID)', placeholder: 'e.g., XAXX010101000', hint: 'Mexican tax identification number' },
-    { name: 'curp', label: 'CURP (Citizen ID)', placeholder: 'e.g., XEXX010101HNEXXXA4', hint: 'Mexican unique citizen registry code' },
-    { name: 'nombre', label: 'First Name', placeholder: 'e.g., Juan' },
-    { name: 'apellidoPaterno', label: 'Paternal Surname', placeholder: 'e.g., García', hint: 'Father\'s last name' },
-    { name: 'apellidoMaterno', label: 'Maternal Surname', placeholder: 'e.g., López', hint: 'Mother\'s last name' },
-    { name: 'fechaNacimiento', label: 'Birth Date', placeholder: 'YYYY-MM-DD', hint: 'Date of birth (ISO format)' },
-    { name: 'entidadNacimiento', label: 'Birth State/Entity', placeholder: 'e.g., CDMX', hint: 'State or entity where person was born' }
-  ],
-  blacklist: [
-    { name: 'nombre', label: 'First Name', placeholder: 'e.g., John' },
-    { name: 'apellidoPaterno', label: 'Paternal Surname', placeholder: 'e.g., Doe', hint: 'Father\'s last name' },
-    { name: 'apellidoMaterno', label: 'Maternal Surname', placeholder: 'e.g., Smith', hint: 'Mother\'s last name' },
-    { name: 'fechaNacimiento', label: 'Birth Date', placeholder: 'YYYY-MM-DD', hint: 'Date of birth (ISO format)' },
-    { name: 'pais', label: 'Country', placeholder: 'e.g., MX, US, UK', hint: 'ISO country code (2 letters)' }
-  ],
-  enrichmentByPhone: [
-    { name: 'phone', label: 'Phone Number', placeholder: 'e.g., +525512345678', hint: 'Phone number with country code' }
-  ],
-  enrichmentByEmail: [
-    { name: 'email', label: 'Email Address', placeholder: 'e.g., example@domain.com', hint: 'Valid email address' }
-  ],
-  enrichmentByName: [
-    { name: 'nombre', label: 'First Name', placeholder: 'e.g., Juan' },
-    { name: 'apellidoPaterno', label: 'Paternal Surname', placeholder: 'e.g., García', hint: 'Father\'s last name' },
-    { name: 'apellidoMaterno', label: 'Maternal Surname', placeholder: 'e.g., López', hint: 'Mother\'s last name (optional)' }
-  ],
-  profilingPhone: [
-    { name: 'phone', label: 'Phone Number', placeholder: 'e.g., +525512345678', hint: 'Phone number with country code' }
-  ],
-  profilingEmail: [
-    { name: 'email', label: 'Email Address', placeholder: 'e.g., example@domain.com', hint: 'Valid email address' }
-  ],
-  renapo: [
-    { name: 'curp', label: 'CURP (Citizen ID)', placeholder: 'e.g., XEXX010101HNEXXXA4', hint: 'Mexican unique citizen registry code to validate' }
-  ]
-};
+function InputPanel({ onSubmit, loading }) {
+  const [phoneData, setPhoneData] = useState({ phone: '' });
+  const [emailData, setEmailData] = useState({ email: '' });
+  const [nameData, setNameData] = useState({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
+  const [curpData, setCurpData] = useState({ curp: '' });
 
-function InputPanel({ selectedApi, onApiChange, onSubmit, loading }) {
-  const [formData, setFormData] = useState({});
-
-  // Reset form when API changes
-  useEffect(() => {
-    setFormData({});
-  }, [selectedApi]);
-
-  const handleInputChange = (fieldName, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [fieldName]: value
-    }));
-  };
-
-  const handleSubmit = (e) => {
+  const handlePhoneSubmit = (e) => {
     e.preventDefault();
-    
-    // Filter out empty fields
-    const cleanData = Object.entries(formData).reduce((acc, [key, value]) => {
-      if (value && value.trim() !== '') {
-        acc[key] = value.trim();
-      }
-      return acc;
-    }, {});
-
-    if (Object.keys(cleanData).length === 0) {
-      alert('Please fill in at least one field');
+    if (!phoneData.phone.trim()) {
+      alert('Please enter a phone number');
       return;
     }
-
-    onSubmit(cleanData);
+    onSubmit({ phone: phoneData.phone.trim() }, 'enrichmentByPhone');
   };
 
-  const currentFields = API_FIELDS[selectedApi];
+  const handleEmailSubmit = (e) => {
+    e.preventDefault();
+    if (!emailData.email.trim()) {
+      alert('Please enter an email address');
+      return;
+    }
+    onSubmit({ email: emailData.email.trim() }, 'enrichmentByEmail');
+  };
+
+  const handleNameSubmit = (e) => {
+    e.preventDefault();
+    if (!nameData.nombre.trim() && !nameData.apellidoPaterno.trim()) {
+      alert('Please enter at least a first name or paternal surname');
+      return;
+    }
+    const cleanData = {
+      ...(nameData.nombre.trim() && { nombre: nameData.nombre.trim() }),
+      ...(nameData.apellidoPaterno.trim() && { apellidoPaterno: nameData.apellidoPaterno.trim() }),
+      ...(nameData.apellidoMaterno.trim() && { apellidoMaterno: nameData.apellidoMaterno.trim() })
+    };
+    onSubmit(cleanData, 'enrichmentByName');
+  };
+
+  const handleCurpSubmit = (e) => {
+    e.preventDefault();
+    if (!curpData.curp.trim()) {
+      alert('Please enter a CURP');
+      return;
+    }
+    onSubmit({ curp: curpData.curp.trim() }, 'renapo');
+  };
 
   return (
     <div className="input-panel">
-      <h2 className="section-title">API Configuration</h2>
+      <h2 className="section-title">Search Options</h2>
 
-      <div className="form-group">
-        <label htmlFor="api-select">Select API Endpoint</label>
-        <select
-          id="api-select"
-          value={selectedApi}
-          onChange={(e) => onApiChange(e.target.value)}
-          disabled={loading}
-        >
-          <option value="enrichment">General Data Enrichment</option>
-          <option value="blacklist">International Blacklists</option>
-          <option value="enrichmentByPhone">Data Enrichment by Phone</option>
-          <option value="enrichmentByEmail">Data Enrichment by Email</option>
-          <option value="enrichmentByName">Data Enrichment by Name</option>
-          <option value="profilingPhone">Contact Profiling - Phone</option>
-          <option value="profilingEmail">Contact Profiling - Email</option>
-          <option value="renapo">RENAPO - CURP Validation</option>
-        </select>
-      </div>
-
-      <div className="api-indicator">
-        <strong>
-          {selectedApi === 'enrichment' && '🔍 General Data Enrichment API'}
-          {selectedApi === 'blacklist' && '⚠️ International Blacklists API'}
-          {selectedApi === 'enrichmentByPhone' && '📱 Data Enrichment by Phone'}
-          {selectedApi === 'enrichmentByEmail' && '📧 Data Enrichment by Email'}
-          {selectedApi === 'enrichmentByName' && '👤 Data Enrichment by Name'}
-          {selectedApi === 'profilingPhone' && '📊 Contact Profiling - Phone'}
-          {selectedApi === 'profilingEmail' && '📊 Contact Profiling - Email'}
-          {selectedApi === 'renapo' && '🇲🇽 RENAPO - CURP Validation'}
-        </strong>
-      </div>
-
-      <form onSubmit={handleSubmit}>
-        <h3 className="section-title" style={{ fontSize: '14px', marginTop: '25px' }}>
-          Search Parameters
-        </h3>
-
-        {currentFields.map(field => (
-          <div className="form-group" key={field.name}>
-            <label htmlFor={field.name}>{field.label}</label>
+      {/* Phone Search Section */}
+      <div className="search-section">
+        <div className="search-header">
+          <span className="search-icon">📱</span>
+          <h3>Data Enrichment by Phone</h3>
+        </div>
+        <form onSubmit={handlePhoneSubmit}>
+          <div className="form-group">
+            <label htmlFor="phone">Phone Number</label>
             <input
-              id={field.name}
+              id="phone"
               type="text"
-              placeholder={field.placeholder}
-              value={formData[field.name] || ''}
-              onChange={(e) => handleInputChange(field.name, e.target.value)}
+              placeholder="e.g., +525512345678 or 526221069217"
+              value={phoneData.phone}
+              onChange={(e) => setPhoneData({ phone: e.target.value })}
               disabled={loading}
             />
-            {field.hint && <small>{field.hint}</small>}
+            <small>Phone number with country code</small>
           </div>
-        ))}
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={loading}
+          >
+            {loading ? 'Searching...' : 'Search Phone'}
+          </button>
+        </form>
+      </div>
 
-        <button 
-          type="submit" 
-          className="btn btn-primary"
-          disabled={loading}
-        >
-          {loading ? 'Querying API...' : 'Submit Query'}
-        </button>
-      </form>
+      {/* Email Search Section */}
+      <div className="search-section">
+        <div className="search-header">
+          <span className="search-icon">📧</span>
+          <h3>Data Enrichment by Email</h3>
+        </div>
+        <form onSubmit={handleEmailSubmit}>
+          <div className="form-group">
+            <label htmlFor="email">Email Address</label>
+            <input
+              id="email"
+              type="text"
+              placeholder="e.g., example@domain.com"
+              value={emailData.email}
+              onChange={(e) => setEmailData({ email: e.target.value })}
+              disabled={loading}
+            />
+            <small>Valid email address</small>
+          </div>
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={loading}
+          >
+            {loading ? 'Searching...' : 'Search Email'}
+          </button>
+        </form>
+      </div>
+
+      {/* Name Search Section */}
+      <div className="search-section">
+        <div className="search-header">
+          <span className="search-icon">👤</span>
+          <h3>Data Enrichment by Name</h3>
+        </div>
+        <form onSubmit={handleNameSubmit}>
+          <div className="form-group">
+            <label htmlFor="nombre">First Name</label>
+            <input
+              id="nombre"
+              type="text"
+              placeholder="e.g., Juan"
+              value={nameData.nombre}
+              onChange={(e) => setNameData({ ...nameData, nombre: e.target.value })}
+              disabled={loading}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="apellidoPaterno">Paternal Surname</label>
+            <input
+              id="apellidoPaterno"
+              type="text"
+              placeholder="e.g., García"
+              value={nameData.apellidoPaterno}
+              onChange={(e) => setNameData({ ...nameData, apellidoPaterno: e.target.value })}
+              disabled={loading}
+            />
+            <small>Father's last name</small>
+          </div>
+          <div className="form-group">
+            <label htmlFor="apellidoMaterno">Maternal Surname (Optional)</label>
+            <input
+              id="apellidoMaterno"
+              type="text"
+              placeholder="e.g., López"
+              value={nameData.apellidoMaterno}
+              onChange={(e) => setNameData({ ...nameData, apellidoMaterno: e.target.value })}
+              disabled={loading}
+            />
+            <small>Mother's last name</small>
+          </div>
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={loading}
+          >
+            {loading ? 'Searching...' : 'Search Name'}
+          </button>
+        </form>
+      </div>
+
+      {/* CURP/RENAPO Search Section */}
+      <div className="search-section">
+        <div className="search-header">
+          <span className="search-icon">🇲🇽</span>
+          <h3>RENAPO - CURP Validation</h3>
+        </div>
+        <form onSubmit={handleCurpSubmit}>
+          <div className="form-group">
+            <label htmlFor="curp">CURP (Citizen ID)</label>
+            <input
+              id="curp"
+              type="text"
+              placeholder="e.g., XEXX010101HNEXXXA4"
+              value={curpData.curp}
+              onChange={(e) => setCurpData({ curp: e.target.value })}
+              disabled={loading}
+            />
+            <small>Mexican unique citizen registry code</small>
+          </div>
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={loading}
+          >
+            {loading ? 'Validating...' : 'Validate CURP'}
+          </button>
+        </form>
+      </div>
 
       <div style={{ marginTop: '20px', fontSize: '11px', color: '#7f8c8d', borderTop: '1px solid #34495e', paddingTop: '15px' }}>
-        <strong>Note:</strong> Fill in at least one parameter. More parameters improve accuracy.
+        <strong>Note:</strong> Each search type queries a different NUFI API endpoint. Results will appear on the right.
       </div>
     </div>
   );

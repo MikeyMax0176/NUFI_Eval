@@ -1,7 +1,7 @@
 {
-  "name": "nufi-eval-client",
+  "name": "guardian-fusion-client",
   "version": "1.0.0",
-  "description": "Frontend GUI for NUFI API testing",
+  "description": "Guardian Fusion Client - Data Intelligence Platform Interface",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
