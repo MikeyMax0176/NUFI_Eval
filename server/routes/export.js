@@ -4,7 +4,7 @@ const { generateDocument } = require('../services/docxGenerator');
 
 /**
  * POST /api/export/docx
- * Generate a professional Word document from NUFI API results
+ * Generate a professional Word document from API results
  * 
  * Body parameters:
  * - data: The API response data
@@ -25,14 +25,52 @@ router.post('/docx', async (req, res) => {
     }
 
     console.log(`[DOCX Export] Generating document for ${apiName}${phoneNumber ? ' - ' + phoneNumber : ''}`);
+    console.log('[DOCX Export] Data structure received:', JSON.stringify({
+      hasData: !!data,
+      dataKeys: data ? Object.keys(data) : [],
+      hasDataData: !!(data && data.data),
+      dataDataKeys: (data && data.data) ? Object.keys(data.data) : [],
+      hasPersonDirect: !!(data && data.person),
+      hasPersonNested: !!(data && data.data && data.data.person)
+    }, null, 2));
 
     // Generate the document
     const buffer = await generateDocument(data, apiName, phoneNumber, metadata || {});
 
-    // Generate filename
-    const timestamp = new Date().toISOString().split('T')[0];
-    const phone = phoneNumber ? `_${phoneNumber}` : '';
-    const docFilename = filename || `NUFI_Report_${apiName}${phone}_${timestamp}.docx`;
+    // Extract selector from data for filename
+    let selector = '';
+    
+    // Try to extract from query.phones
+    if (data.query && data.query.phones && data.query.phones.length > 0) {
+      const phone = data.query.phones[0];
+      selector = phone.display_international || phone.display || phone.number || phone.raw || phone;
+      // Clean up selector
+      if (typeof selector === 'number') selector = String(selector);
+      selector = selector.replace(/\+/g, '').replace(/\s+/g, '');
+    } 
+    // Fallback to phoneNumber parameter
+    else if (phoneNumber) {
+      selector = String(phoneNumber).replace(/\+/g, '').replace(/\s+/g, '');
+    }
+    // Try person.phones if available
+    else if (data.person && data.person.phones && data.person.phones.length > 0) {
+      const phone = data.person.phones[0];
+      selector = phone.display_international || phone.display || phone.number || phone;
+      if (typeof selector === 'number') selector = String(selector);
+      selector = selector.replace(/\+/g, '').replace(/\s+/g, '');
+    }
+    // Last resort: use provided phone or unknown
+    else {
+      selector = phoneNumber || 'Unknown';
+    }
+    
+    // Sanitize selector for filename (remove special characters, limit length)
+    const sanitizedSelector = String(selector)
+      .replace(/[^a-zA-Z0-9_-]/g, '')
+      .substring(0, 50) || 'report';
+
+    // Generate filename: selector followed by "Enrichment.docx"
+    const docFilename = filename || `${sanitizedSelector} Enrichment.docx`;
 
     // Set headers for file download
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');

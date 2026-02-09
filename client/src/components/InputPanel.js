@@ -5,6 +5,12 @@ function InputPanel({ onSubmit, loading }) {
   const [emailData, setEmailData] = useState({ email: '' });
   const [nameData, setNameData] = useState({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
   const [curpData, setCurpData] = useState({ curp: '' });
+  
+  // Collapse states
+  const [phoneExpanded, setPhoneExpanded] = useState(true);
+  const [emailExpanded, setEmailExpanded] = useState(false);
+  const [nameExpanded, setNameExpanded] = useState(false);
+  const [curpExpanded, setCurpExpanded] = useState(false);
 
   const handlePhoneSubmit = (e) => {
     e.preventDefault();
@@ -53,10 +59,12 @@ function InputPanel({ onSubmit, loading }) {
 
       {/* Phone Search Section */}
       <div className="search-section">
-        <div className="search-header">
+        <div className="search-header" onClick={() => setPhoneExpanded(!phoneExpanded)}>
           <span className="search-icon">📱</span>
-          <h3>Data Enrichment by Phone</h3>
+          <h3>Phone</h3>
+          <span className="collapse-arrow">{phoneExpanded ? '▼' : '▶'}</span>
         </div>
+        {phoneExpanded && (
         <form onSubmit={handlePhoneSubmit}>
           <div className="form-group">
             <label htmlFor="phone">Phone Number</label>
@@ -78,14 +86,17 @@ function InputPanel({ onSubmit, loading }) {
             {loading ? 'Searching...' : 'Search Phone'}
           </button>
         </form>
+        )}
       </div>
 
       {/* Email Search Section */}
       <div className="search-section">
-        <div className="search-header">
+        <div className="search-header" onClick={() => setEmailExpanded(!emailExpanded)}>
           <span className="search-icon">📧</span>
-          <h3>Data Enrichment by Email</h3>
+          <h3>Email</h3>
+          <span className="collapse-arrow">{emailExpanded ? '▼' : '▶'}</span>
         </div>
+        {emailExpanded && (
         <form onSubmit={handleEmailSubmit}>
           <div className="form-group">
             <label htmlFor="email">Email Address</label>
@@ -107,14 +118,17 @@ function InputPanel({ onSubmit, loading }) {
             {loading ? 'Searching...' : 'Search Email'}
           </button>
         </form>
+        )}
       </div>
 
       {/* Name Search Section */}
       <div className="search-section">
-        <div className="search-header">
+        <div className="search-header" onClick={() => setNameExpanded(!nameExpanded)}>
           <span className="search-icon">👤</span>
-          <h3>Data Enrichment by Name</h3>
+          <h3>Name</h3>
+          <span className="collapse-arrow">{nameExpanded ? '▼' : '▶'}</span>
         </div>
+        {nameExpanded && (
         <form onSubmit={handleNameSubmit}>
           <div className="form-group">
             <label htmlFor="nombre">First Name</label>
@@ -159,14 +173,17 @@ function InputPanel({ onSubmit, loading }) {
             {loading ? 'Searching...' : 'Search Name'}
           </button>
         </form>
+        )}
       </div>
 
       {/* CURP/RENAPO Search Section */}
       <div className="search-section">
-        <div className="search-header">
+        <div className="search-header" onClick={() => setCurpExpanded(!curpExpanded)} style={{ cursor: 'pointer' }}>
           <span className="search-icon">🇲🇽</span>
-          <h3>RENAPO - CURP Validation</h3>
+          <h3>CURP</h3>
+          <span className="collapse-arrow">{curpExpanded ? '▼' : '▶'}</span>
         </div>
+        {curpExpanded && (
         <form onSubmit={handleCurpSubmit}>
           <div className="form-group">
             <label htmlFor="curp">CURP (Citizen ID)</label>
@@ -188,10 +205,11 @@ function InputPanel({ onSubmit, loading }) {
             {loading ? 'Validating...' : 'Validate CURP'}
           </button>
         </form>
+        )}
       </div>
 
       <div style={{ marginTop: '20px', fontSize: '11px', color: '#7f8c8d', borderTop: '1px solid #34495e', paddingTop: '15px' }}>
-        <strong>Note:</strong> Each search type queries a different NUFI API endpoint. Results will appear on the right.
+        <strong>Note:</strong> Each search type queries a different API endpoint. Results will appear on the right.
       </div>
     </div>
   );

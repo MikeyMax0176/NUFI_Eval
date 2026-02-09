@@ -71,7 +71,7 @@ app.get('/api/health', (req, res) => {
 // Root route
 app.get('/', (req, res) => {
   res.json({
-    name: 'Guardian Fusion API Server',
+    name: 'MX Enrichment API Server',
     status: 'running',
     environment: NODE_ENV,
     endpoints: {
@@ -101,6 +101,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Guardian Fusion Server running on port ${PORT}`);
+  console.log(`🚀 MX Enrichment Server running on port ${PORT}`);
   console.log(`📊 API Stats available at http://localhost:${PORT}/api/stats`);
 });

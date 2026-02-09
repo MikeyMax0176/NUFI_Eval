@@ -1,7 +1,7 @@
 {
-  "name": "guardian-fusion-server",
+  "name": "mx-enrichment-server",
   "version": "1.0.0",
-  "description": "Guardian Fusion API Server - Secure proxy for NUFI API",
+  "description": "MX Enrichment API Server - Secure proxy for NUFI API",
   "main": "index.js",
   "scripts": {
     "dev": "nodemon index.js",

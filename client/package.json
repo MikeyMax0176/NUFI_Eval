@@ -1,7 +1,7 @@
 {
-  "name": "guardian-fusion-client",
+  "name": "mx-enrichment-client",
   "version": "1.0.0",
-  "description": "Guardian Fusion Client - Data Intelligence Platform Interface",
+  "description": "MX Enrichment Client - Data Intelligence Platform Interface",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",

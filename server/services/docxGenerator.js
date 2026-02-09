@@ -10,29 +10,29 @@ const {
   AlignmentType,
   BorderStyle,
   WidthType,
-  TableOfContents,
   PageBreak,
   Header,
   Footer,
   PageNumber,
-  NumberFormat
+  NumberFormat,
+  TableLayoutType,
+  VerticalAlign
 } = require('docx');
 
 /**
- * Professional Word Document Generator for NUFI API Reports
- * Creates clean, structured .docx files with proper styles, TOC, headers/footers
+ * Professional Word Document Generator for Enrichment Reports
+ * Creates clean, sanitized dossier-style reports with no vendor branding
  */
 
-// Brand colors
-const BLG_BLUE = '0066CC';
-const TEXT_DARK = '2C3E50';
-const TEXT_MEDIUM = '34495E';
-const BACKGROUND_LIGHT = 'F8F9FA';
+// Neutral colors for professional reports
+const HEADER_COLOR = '2C3E50';
+const TEXT_COLOR = '34495E';
+const BACKGROUND_LIGHT = 'F5F5F5';
 
 /**
- * Sanitize content - remove duplicates and clean up data
+ * Sanitize content - remove vendor strings, quota/QPS fields, and internal metadata
  */
-const sanitizeContent = (data) => {
+const sanitizeForDoc = (data, debugMode = false) => {
   // Create a deep clone to avoid mutations
   const sanitized = JSON.parse(JSON.stringify(data));
   
@@ -46,17 +46,30 @@ const sanitizeContent = (data) => {
     
     const cleaned = {};
     for (const [key, value] of Object.entries(obj)) {
-      // Remove internal fields
+      // Remove internal/metadata fields
       if (key === '@search_pointer' || 
           key === 'search_pointer' || 
           key.endsWith('_md5') || 
           key === '@inferred' ||
-          key === '@id') {
+          key === '@id' ||
+          key === 'brandBlocks') {
         continue;
       }
       
-      // Remove duplicate brand blocks
-      if (key === 'brandBlocks') {
+      // Remove quota/QPS fields unless debug mode is enabled
+      if (!debugMode && (
+          key === 'quota_allotted' ||
+          key === 'quota_current' ||
+          key === 'quota_reset' ||
+          key === 'qps_allotted' ||
+          key === 'qps_current' ||
+          key.includes('quota') ||
+          key.includes('qps'))) {
+        continue;
+      }
+      
+      // Remove endpoint reference
+      if (key === 'endpoint') {
         continue;
       }
       
@@ -76,240 +89,160 @@ const sanitizeContent = (data) => {
  * Format date consistently
  */
 const formatDate = (dateString) => {
-  if (!dateString) return 'N/A';
+  if (!dateString) return '';
   try {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: '2-digit',
-      day: '2-digit',
-      year: 'numeric'
-    });
+    return date.toISOString().split('T')[0]; // YYYY-MM-DD format
   } catch {
     return dateString;
   }
 };
 
 /**
- * Format phone number
+ * Format datetime with UTC timezone
+ */
+const formatDateTime = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
+  } catch {
+    return dateString;
+  }
+};
+
+/**
+ * Format phone number for display
  */
 const formatPhoneNumber = (phone) => {
-  if (!phone) return 'N/A';
+  if (!phone) return '';
   const cleaned = phone.toString().replace(/\D/g, '');
-  if (cleaned.length === 12) {
-    return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8)}`;
+  if (cleaned.length >= 10) {
+    // International format with country code
+    if (cleaned.length === 12) {
+      return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8)}`;
+    }
+    if (cleaned.length === 11) {
+      return `+${cleaned.slice(0, 1)} ${cleaned.slice(1, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7)}`;
+    }
+    if (cleaned.length === 10) {
+      return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6)}`;
+    }
   }
   return phone;
 };
 
 /**
- * Create cover page with title, MSISDN, metadata
+ * Extract selector (phone number) from query data
  */
-const createCoverPage = (apiName, phoneNumber, metadata = {}) => {
-  const timestamp = new Date().toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZoneName: 'short'
-  });
+const extractSelector = (data) => {
+  if (data.query && data.query.phones && data.query.phones.length > 0) {
+    const phone = data.query.phones[0];
+    return phone.number || phone.raw || phone;
+  }
+  return 'Unknown';
+};
 
+/**
+ * Extract country code from query data
+ */
+const extractCountryCode = (data) => {
+  if (data.query && data.query.phones && data.query.phones.length > 0) {
+    const phone = data.query.phones[0];
+    if (phone.country_code) return phone.country_code;
+  }
+  return '';
+};
+
+/**
+ * Create document title - just the selector (phone number) and optional subtitle
+ */
+const createTitle = (selector) => {
   return [
-    // Title
     new Paragraph({
-      text: 'Blueline | Global Technologies',
-      heading: HeadingLevel.TITLE,
-      spacing: { after: 200 },
-      alignment: AlignmentType.CENTER
-    }),
-    new Paragraph({
-      text: 'ITERATIVE TASKING',
-      spacing: { after: 400 },
-      alignment: AlignmentType.CENTER,
-      style: 'Strong'
-    }),
-    new Paragraph({
-      text: `NUFI API Report: ${apiName}`,
+      text: selector,
       heading: HeadingLevel.HEADING_1,
-      spacing: { before: 600, after: 400 },
-      alignment: AlignmentType.CENTER
-    }),
-    
-    // Phone number if provided
-    ...(phoneNumber ? [
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: 'MSISDN: ',
-            bold: true,
-            size: 28
-          }),
-          new TextRun({
-            text: formatPhoneNumber(phoneNumber),
-            size: 28,
-            color: BLG_BLUE
-          })
-        ],
-        spacing: { after: 300 },
-        alignment: AlignmentType.CENTER
-      })
-    ] : []),
-    
-    // Metadata
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: 'Report Generated: ',
-          bold: true
-        }),
-        new TextRun({
-          text: timestamp
-        })
-      ],
       spacing: { after: 100 },
       alignment: AlignmentType.CENTER
     }),
-    
-    ...(metadata.caseId ? [
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: 'Case ID: ',
-            bold: true
-          }),
-          new TextRun({
-            text: metadata.caseId
-          })
-        ],
-        spacing: { after: 100 },
-        alignment: AlignmentType.CENTER
-      })
-    ] : []),
-    
-    // Classification footer
     new Paragraph({
-      text: 'INTERNAL USE ONLY - CONFIDENTIAL',
-      spacing: { before: 800 },
+      text: 'Enrichment Report',
+      spacing: { after: 400 },
       alignment: AlignmentType.CENTER,
-      style: 'IntenseQuote'
-    }),
-    
-    // Page break after cover
-    new Paragraph({
-      children: [new PageBreak()]
+      style: 'Subtitle'
     })
   ];
 };
 
 /**
- * Create Table of Contents
+ * Create Query Summary table
  */
-const createTableOfContents = () => {
-  return [
-    new Paragraph({
-      text: 'Table of Contents',
-      heading: HeadingLevel.HEADING_1,
-      spacing: { after: 200 }
-    }),
-    new TableOfContents('Table of Contents', {
-      hyperlink: true,
-      headingStyleRange: '1-3'
-    }),
-    new Paragraph({
-      children: [new PageBreak()],
-      spacing: { before: 400 }
-    })
-  ];
-};
-
-/**
- * Create metrics table from data
- */
-const createMetricsTable = (title, data, columnHeaders = []) => {
-  if (!data || (Array.isArray(data) && data.length === 0)) {
-    return [
-      new Paragraph({
-        text: `${title}: No data available`,
-        italics: true,
-        spacing: { after: 200 }
-      })
-    ];
-  }
-
-  const rows = [];
+const createQuerySummary = (data) => {
+  const selector = extractSelector(data);
+  const countryCode = extractCountryCode(data);
+  const queryDate = data.query && data.query.timestamp ? formatDate(data.query.timestamp) : formatDate(new Date());
   
-  // Add header row
-  if (columnHeaders.length > 0) {
+  const rows = [
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ text: 'Queried Phone', bold: true })],
+          width: { size: 30, type: WidthType.PERCENTAGE },
+          shading: { fill: BACKGROUND_LIGHT }
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: selector })],
+          width: { size: 70, type: WidthType.PERCENTAGE }
+        })
+      ]
+    })
+  ];
+  
+  if (countryCode) {
     rows.push(
       new TableRow({
-        children: columnHeaders.map(header => 
+        children: [
           new TableCell({
-            children: [
-              new Paragraph({
-                text: header,
-                bold: true,
-                alignment: AlignmentType.CENTER
-              })
-            ],
+            children: [new Paragraph({ text: 'Country Code', bold: true })],
             shading: { fill: BACKGROUND_LIGHT }
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: String(countryCode) })]
           })
-        ),
-        tableHeader: true
+        ]
       })
     );
   }
-
-  // Add data rows
-  if (Array.isArray(data)) {
-    data.forEach((item, index) => {
-      const cells = typeof item === 'object' 
-        ? Object.values(item).map(val => String(val || 'N/A'))
-        : [String(index + 1), String(item)];
-      
-      rows.push(
-        new TableRow({
-          children: cells.map((cell, idx) =>
-            new TableCell({
-              children: [
-                new Paragraph({
-                  text: cell,
-                  alignment: idx > 0 ? AlignmentType.RIGHT : AlignmentType.LEFT
-                })
-              ]
-            })
-          )
+  
+  rows.push(
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ text: 'Query Date', bold: true })],
+          shading: { fill: BACKGROUND_LIGHT }
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: queryDate })]
         })
-      );
-    });
-  } else if (typeof data === 'object') {
-    // Object - convert to key-value rows
-    Object.entries(data).forEach(([key, value]) => {
-      rows.push(
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [new Paragraph({ text: key, bold: true })],
-              width: { size: 40, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-              children: [new Paragraph({ text: String(value || 'N/A') })],
-              width: { size: 60, type: WidthType.PERCENTAGE }
-            })
-          ]
-        })
-      );
-    });
-  }
-
+      ]
+    })
+  );
+  
   return [
     new Paragraph({
-      text: title,
+      text: 'Query Summary',
       heading: HeadingLevel.HEADING_2,
-      spacing: { before: 300, after: 150 }
+      spacing: { before: 200, after: 100 }
     }),
     new Table({
       rows,
       width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
       borders: {
         top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
         bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
@@ -324,105 +257,499 @@ const createMetricsTable = (title, data, columnHeaders = []) => {
 };
 
 /**
- * Create analyst assessment callout box
+ * Create Names table
  */
-const createAnalystCallout = (content) => {
-  return new Paragraph({
+const createNamesTable = (names) => {
+  if (!names || !Array.isArray(names) || names.length === 0) {
+    return [];
+  }
+
+  const headerRow = new TableRow({
     children: [
-      new TextRun({
-        text: '💡 Analyst Assessment: ',
-        bold: true,
-        color: BLG_BLUE
+      new TableCell({
+        children: [new Paragraph({ text: 'Display Name', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 20, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
       }),
-      new TextRun({
-        text: content
+      new TableCell({
+        children: [new Paragraph({ text: 'First', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 15, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Middle', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 15, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Last', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 15, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Valid Since', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 17, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Last Seen', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 18, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
       })
     ],
-    spacing: { before: 200, after: 200 },
-    indent: { left: 400 },
-    border: {
-      left: { style: BorderStyle.SINGLE, size: 20, color: BLG_BLUE }
-    },
-    shading: { fill: BACKGROUND_LIGHT }
+    tableHeader: true
   });
+
+  const dataRows = names.map(name => 
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ text: name.display || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: name.first || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: name.middle || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: name.last || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: formatDate(name.valid_since) || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: formatDate(name.last_seen) || '' })]
+        })
+      ]
+    })
+  );
+
+  return [
+    new Paragraph({
+      text: 'Names',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 100 }
+    }),
+    new Table({
+      rows: [headerRow, ...dataRows],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        left: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        right: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: 'E0E0E0' },
+        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: 'E0E0E0' }
+      }
+    }),
+    new Paragraph({ text: '', spacing: { after: 200 } })
+  ];
 };
 
 /**
- * Render nested object as structured sections
+ * Create Phones table
  */
-const renderObjectSections = (obj, headingLevel = HeadingLevel.HEADING_2) => {
-  if (!obj || typeof obj !== 'object') {
-    return [new Paragraph({ text: 'No data available', italics: true })];
+const createPhonesTable = (phones) => {
+  if (!phones || !Array.isArray(phones) || phones.length === 0) {
+    return [];
   }
 
-  const elements = [];
+  const headerRow = new TableRow({
+    children: [
+      new TableCell({
+        children: [new Paragraph({ text: 'Phone (Intl)', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 18, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Phone (Local)', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 18, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Type', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 12, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Carrier', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 16, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Valid Since', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 18, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Last Seen', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 18, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      })
+    ],
+    tableHeader: true
+  });
 
-  for (const [key, value] of Object.entries(obj)) {
-    // Skip metadata fields
-    if (key === 'metadata' || key.startsWith('@') || key === 'brandBlocks') continue;
-
-    const label = key
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/[_-]/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ')
-      .trim();
-
-    if (value === null || value === undefined) {
-      elements.push(
-        new Paragraph({
-          children: [
-            new TextRun({ text: `${label}: `, bold: true }),
-            new TextRun({ text: 'N/A', italics: true, color: '999999' })
-          ],
-          spacing: { after: 100 }
-        })
-      );
-    } else if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 3) {
-      // Large nested object - create subsection
-      elements.push(
-        new Paragraph({
-          text: label,
-          heading: headingLevel === HeadingLevel.HEADING_2 ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_4,
-          spacing: { before: 200, after: 100 }
+  const dataRows = phones.map(phone => 
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ text: formatPhoneNumber(phone.number) || '' })]
         }),
-        ...renderObjectSections(value, HeadingLevel.HEADING_3)
-      );
-    } else if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
-      // Array of objects - create table
-      const columns = Object.keys(value[0]);
-      elements.push(...createMetricsTable(label, value, columns));
-    } else {
-      // Simple value
-      const displayValue = Array.isArray(value) 
-        ? value.join(', ') 
-        : typeof value === 'object' 
-          ? JSON.stringify(value, null, 2)
-          : String(value);
+        new TableCell({
+          children: [new Paragraph({ text: phone.display_international || phone.display || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: phone.type || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: phone.carrier || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: formatDate(phone.valid_since) || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: formatDate(phone.last_seen) || '' })]
+        })
+      ]
+    })
+  );
 
+  return [
+    new Paragraph({
+      text: 'Phones',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 100 }
+    }),
+    new Table({
+      rows: [headerRow, ...dataRows],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        left: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        right: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: 'E0E0E0' },
+        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: 'E0E0E0' }
+      }
+    }),
+    new Paragraph({ text: '', spacing: { after: 200 } })
+  ];
+};
+
+/**
+ * Create Emails table
+ */
+const createEmailsTable = (emails) => {
+  if (!emails || !Array.isArray(emails) || emails.length === 0) {
+    return [];
+  }
+
+  const headerRow = new TableRow({
+    children: [
+      new TableCell({
+        children: [new Paragraph({ text: 'Email', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 40, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Type', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 15, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Valid Since', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 22, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Last Seen', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 23, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      })
+    ],
+    tableHeader: true
+  });
+
+  const dataRows = emails.map(email => 
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ text: email.address || email.email || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: email.type || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: formatDate(email.valid_since) || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: formatDate(email.last_seen) || '' })]
+        })
+      ]
+    })
+  );
+
+  return [
+    new Paragraph({
+      text: 'Emails',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 100 }
+    }),
+    new Table({
+      rows: [headerRow, ...dataRows],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        left: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        right: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: 'E0E0E0' },
+        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: 'E0E0E0' }
+      }
+    }),
+    new Paragraph({ text: '', spacing: { after: 200 } })
+  ];
+};
+
+/**
+ * Create Addresses table
+ */
+const createAddressesTable = (addresses) => {
+  if (!addresses || !Array.isArray(addresses) || addresses.length === 0) {
+    return [];
+  }
+
+  const headerRow = new TableRow({
+    children: [
+      new TableCell({
+        children: [new Paragraph({ text: 'Address (Display)', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 30, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'City', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 15, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'State', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 10, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Country', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 10, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Valid Since', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 17, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Last Seen', bold: true, alignment: AlignmentType.CENTER })],
+        width: { size: 18, type: WidthType.PERCENTAGE },
+        shading: { fill: BACKGROUND_LIGHT }
+      })
+    ],
+    tableHeader: true
+  });
+
+  const dataRows = addresses.map(addr => 
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ text: addr.display || addr.address || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: addr.city || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: addr.state || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: addr.country || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: formatDate(addr.valid_since) || '' })]
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: formatDate(addr.last_seen) || '' })]
+        })
+      ]
+    })
+  );
+
+  return [
+    new Paragraph({
+      text: 'Addresses',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 100 }
+    }),
+    new Table({
+      rows: [headerRow, ...dataRows],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        left: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        right: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: 'E0E0E0' },
+        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: 'E0E0E0' }
+      }
+    }),
+    new Paragraph({ text: '', spacing: { after: 200 } })
+  ];
+};
+
+/**
+ * Create Demographics section (Gender and Languages)
+ */
+const createDemographics = (data) => {
+  const elements = [];
+  
+  // Gender
+  if (data.gender || (data.genders && data.genders.length > 0)) {
+    const gender = data.gender || (data.genders && data.genders[0] ? data.genders[0].content || data.genders[0] : '');
+    if (gender) {
       elements.push(
         new Paragraph({
           children: [
-            new TextRun({ text: `${label}: `, bold: true }),
-            new TextRun({ text: displayValue })
+            new TextRun({ text: 'Gender: ', bold: true }),
+            new TextRun({ text: gender.charAt(0).toUpperCase() + gender.slice(1) })
           ],
           spacing: { after: 100 }
         })
       );
     }
   }
-
-  return elements;
+  
+  // Languages
+  if (data.languages && Array.isArray(data.languages) && data.languages.length > 0) {
+    const languagesStr = data.languages.map(lang => {
+      if (typeof lang === 'string') return lang;
+      if (lang.language && lang.region) return `${lang.language} (${lang.region})`;
+      if (lang.language) return lang.language;
+      return JSON.stringify(lang);
+    }).join(', ');
+    
+    elements.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'Languages: ', bold: true }),
+          new TextRun({ text: languagesStr })
+        ],
+        spacing: { after: 100 }
+      })
+    );
+  }
+  
+  if (elements.length === 0) {
+    return [];
+  }
+  
+  return [
+    new Paragraph({
+      text: 'Demographics',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 100 }
+    }),
+    ...elements,
+    new Paragraph({ text: '', spacing: { after: 200 } })
+  ];
 };
 
 /**
- * Main document generation function
+ * Create Available Data (Premium Counts) table
+ */
+const createAvailableDataTable = (data) => {
+  const counts = {
+    'Addresses': 0,
+    'Phones': 0,
+    'Emails': 0,
+    'Names': 0,
+    'Genders': 0,
+    'Languages': 0
+  };
+  
+  if (data.addresses && Array.isArray(data.addresses)) counts['Addresses'] = data.addresses.length;
+  if (data.phones && Array.isArray(data.phones)) counts['Phones'] = data.phones.length;
+  if (data.emails && Array.isArray(data.emails)) counts['Emails'] = data.emails.length;
+  if (data.names && Array.isArray(data.names)) counts['Names'] = data.names.length;
+  if (data.genders && Array.isArray(data.genders)) counts['Genders'] = data.genders.length;
+  else if (data.gender) counts['Genders'] = 1;
+  if (data.languages && Array.isArray(data.languages)) counts['Languages'] = data.languages.length;
+  
+  const rows = [
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ text: 'Data Type', bold: true, alignment: AlignmentType.CENTER })],
+          width: { size: 50, type: WidthType.PERCENTAGE },
+          shading: { fill: BACKGROUND_LIGHT }
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: 'Count', bold: true, alignment: AlignmentType.CENTER })],
+          width: { size: 50, type: WidthType.PERCENTAGE },
+          shading: { fill: BACKGROUND_LIGHT }
+        })
+      ],
+      tableHeader: true
+    })
+  ];
+  
+  Object.entries(counts).forEach(([type, count]) => {
+    rows.push(
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ text: type })]
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: String(count), alignment: AlignmentType.CENTER })]
+          })
+        ]
+      })
+    );
+  });
+  
+  return [
+    new Paragraph({
+      text: 'Available Data',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 100 }
+    }),
+    new Table({
+      rows,
+      width: { size: 60, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        left: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        right: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: 'E0E0E0' },
+        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: 'E0E0E0' }
+      }
+    }),
+    new Paragraph({ text: '', spacing: { after: 200 } })
+  ];
+};
+
+/**
+ * Main document generation function - Creates professional dossier-style report
  */
 const generateDocument = async (data, apiName, phoneNumber = null, metadata = {}) => {
-  const sanitized = sanitizeContent(data);
+  // Sanitize data to remove vendor strings and quota/QPS fields
+  const sanitized = sanitizeForDoc(data, metadata.debugMode || false);
   
-  // Extract response data
+  // Extract response data - handle both direct and nested structures
   let responseData;
   if (sanitized.data) {
     responseData = sanitized.data;
@@ -431,78 +758,141 @@ const generateDocument = async (data, apiName, phoneNumber = null, metadata = {}
   } else {
     responseData = sanitized;
   }
+  
+  // Handle additional nesting: if responseData has {status, message, data: {...}}
+  // Extract the inner data object
+  if (responseData.data && responseData.status && !responseData.person) {
+    responseData = responseData.data;
+  }
+  
+  console.log('[generateDocument] After extraction:', JSON.stringify({
+    originalKeys: Object.keys(sanitized),
+    responseDataKeys: Object.keys(responseData),
+    hasQuery: !!responseData.query,
+    hasPerson: !!responseData.person,
+    queryKeys: responseData.query ? Object.keys(responseData.query) : [],
+    personKeys: responseData.person ? Object.keys(responseData.person) : []
+  }, null, 2));
+  
+  // If data is nested in a 'person' object (NUFI API structure), extract it
+  // But keep query and other top-level fields
+  if (responseData.person) {
+    responseData = {
+      ...responseData,
+      ...responseData.person,
+      // Normalize field names from @-prefixed to regular
+      names: responseData.person.names?.map(n => ({
+        display: n.display || '',
+        first: n.first || '',
+        middle: n.middle || '',
+        last: n.last || '',
+        valid_since: n['@valid_since'] || n.valid_since || '',
+        last_seen: n['@last_seen'] || n.last_seen || ''
+      })) || [],
+      phones: responseData.person.phones?.map(p => ({
+        number: p.number || '',
+        display: p.display || '',
+        display_international: p.display_international || '',
+        type: p['@type'] || p.type || '',
+        carrier: p.carrier || '',
+        valid_since: p['@valid_since'] || p.valid_since || '',
+        last_seen: p['@last_seen'] || p.last_seen || ''
+      })) || [],
+      emails: responseData.person.emails?.map(e => ({
+        address: e.address || e.display || '',
+        type: e['@type'] || e.type || '',
+        valid_since: e['@valid_since'] || e.valid_since || '',
+        last_seen: e['@last_seen'] || e.last_seen || ''
+      })) || [],
+      addresses: responseData.person.addresses?.map(a => ({
+        display: a.display || a.address || '',
+        city: a.city || '',
+        state: a.state || '',
+        country: a.country || '',
+        valid_since: a['@valid_since'] || a.valid_since || '',
+        last_seen: a['@last_seen'] || a.last_seen || ''
+      })) || [],
+      gender: typeof responseData.person.gender === 'object' ? responseData.person.gender.content : responseData.person.gender,
+      languages: responseData.person.languages || []
+    };
+  }
+
+  // Extract selector (phone number) for title
+  const selector = extractSelector(responseData);
+  const generatedDateTime = formatDateTime(new Date());
 
   // Build document sections
   const sections = [];
 
-  // 1. Cover Page
-  sections.push(...createCoverPage(apiName, phoneNumber, metadata));
+  // 1. Title
+  sections.push(...createTitle(selector));
 
-  // 2. Table of Contents
-  sections.push(...createTableOfContents());
+  // 2. Query Summary
+  sections.push(...createQuerySummary(responseData));
 
-  // 3. Query Information Section
+  // 3. Identity Summary Header
   sections.push(
     new Paragraph({
-      text: '1. Query Information',
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 200, after: 150 },
-      pageBreakBefore: false
+      text: 'Identity Summary',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 100 }
     })
   );
 
-  const queryInfo = {
-    'API Endpoint': metadata.endpoint || apiName,
-    'Query Timestamp': formatDate(metadata.timestamp),
-    'Parameters Used': metadata.paramsUsed ? metadata.paramsUsed.join(', ') : 'N/A',
-    ...(phoneNumber && { 'Phone Number': formatPhoneNumber(phoneNumber) })
-  };
-
-  sections.push(...createMetricsTable('Query Details', queryInfo));
-
-  // 4. Results Data Section
-  sections.push(
-    new Paragraph({
-      text: '2. Results Data',
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 400, after: 150 },
-      pageBreakBefore: true
-    })
-  );
-
-  sections.push(...renderObjectSections(responseData));
-
-  // 5. Appendices (if any attachments or references)
-  if (sanitized.attachments || sanitized.references) {
-    sections.push(
-      new Paragraph({
-        text: 'Appendix A: Supporting Documents',
-        heading: HeadingLevel.HEADING_1,
-        spacing: { before: 400, after: 150 },
-        pageBreakBefore: true
-      })
-    );
-    
-    if (sanitized.attachments) {
-      sections.push(...renderObjectSections(sanitized.attachments));
-    }
-    if (sanitized.references) {
-      sections.push(...renderObjectSections(sanitized.references));
-    }
+  // 4. Names Table
+  if (responseData.names && responseData.names.length > 0) {
+    sections.push(...createNamesTable(responseData.names));
   }
+
+  // 5. Phones Table
+  if (responseData.phones && responseData.phones.length > 0) {
+    sections.push(...createPhonesTable(responseData.phones));
+  }
+
+  // 6. Emails Table
+  if (responseData.emails && responseData.emails.length > 0) {
+    sections.push(...createEmailsTable(responseData.emails));
+  }
+
+  // 7. Addresses Table
+  if (responseData.addresses && responseData.addresses.length > 0) {
+    sections.push(...createAddressesTable(responseData.addresses));
+  }
+
+  // 8. Demographics (Gender and Languages)
+  sections.push(...createDemographics(responseData));
+
+  // 9. Available Data (Premium Counts)
+  sections.push(...createAvailableDataTable(responseData));
+
+  // 10. Metadata (Generated timestamp only)
+  sections.push(
+    new Paragraph({
+      text: 'Report Metadata',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 100 }
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({ text: 'Generated: ', bold: true }),
+        new TextRun({ text: generatedDateTime })
+      ],
+      spacing: { after: 100 }
+    })
+  );
 
   // Create document
   const doc = new Document({
-    creator: 'Guardian Fusion - Blueline Global Technologies',
-    title: `NUFI Report - ${apiName}`,
-    description: `Generated report for ${phoneNumber || 'NUFI query'}`,
+    creator: 'Enrichment Report Generator',
+    title: `Enrichment Report - ${selector}`,
+    description: `Enrichment report for ${selector}`,
     styles: {
       paragraphStyles: [
         {
           id: 'Normal',
           name: 'Normal',
           run: {
-            font: 'Aptos',
+            font: 'Calibri',
             size: 22 // 11pt
           },
           paragraph: {
@@ -510,13 +900,13 @@ const generateDocument = async (data, apiName, phoneNumber = null, metadata = {}
           }
         },
         {
-          id: 'Strong',
-          name: 'Strong',
+          id: 'Subtitle',
+          name: 'Subtitle',
           basedOn: 'Normal',
           run: {
-            bold: true,
-            font: 'Aptos',
-            size: 24
+            font: 'Calibri',
+            size: 24,
+            color: TEXT_COLOR
           }
         }
       ]
@@ -536,11 +926,52 @@ const generateDocument = async (data, apiName, phoneNumber = null, metadata = {}
         headers: {
           default: new Header({
             children: [
-              new Paragraph({
-                text: `${apiName} Report ${phoneNumber ? '- ' + formatPhoneNumber(phoneNumber) : ''}`,
-                alignment: AlignmentType.CENTER,
-                style: 'Normal',
-                spacing: { after: 100 }
+              new Table({
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            text: selector,
+                            alignment: AlignmentType.LEFT
+                          })
+                        ],
+                        borders: {
+                          top: { style: BorderStyle.NONE },
+                          bottom: { style: BorderStyle.NONE },
+                          left: { style: BorderStyle.NONE },
+                          right: { style: BorderStyle.NONE }
+                        },
+                        width: { size: 50, type: WidthType.PERCENTAGE }
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            text: `Generated: ${generatedDateTime}`,
+                            alignment: AlignmentType.RIGHT
+                          })
+                        ],
+                        borders: {
+                          top: { style: BorderStyle.NONE },
+                          bottom: { style: BorderStyle.NONE },
+                          left: { style: BorderStyle.NONE },
+                          right: { style: BorderStyle.NONE }
+                        },
+                        width: { size: 50, type: WidthType.PERCENTAGE }
+                      })
+                    ]
+                  })
+                ],
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.NONE },
+                  bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+                  left: { style: BorderStyle.NONE },
+                  right: { style: BorderStyle.NONE },
+                  insideHorizontal: { style: BorderStyle.NONE },
+                  insideVertical: { style: BorderStyle.NONE }
+                }
               })
             ]
           })
@@ -571,7 +1002,7 @@ const generateDocument = async (data, apiName, phoneNumber = null, metadata = {}
 
 module.exports = {
   generateDocument,
-  sanitizeContent,
+  sanitizeForDoc,
   formatDate,
   formatPhoneNumber
 };

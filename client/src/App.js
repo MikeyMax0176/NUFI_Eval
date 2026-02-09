@@ -72,7 +72,7 @@ function App() {
     <div className="app">
       <div className="container">
         <div className="header">
-          <h1>Guardian Fusion</h1>
+          <h1>MX Enrichment</h1>
           <p>Data Intelligence and Verification Platform</p>
         </div>
 

@@ -105,18 +105,18 @@ export const exportToCSV = (data, filename) => {
 };
 
 /**
- * Sanitize data for export - remove internal fields
+ * Sanitize data for export - remove internal fields, vendor strings, and quota/QPS data
  */
-const sanitizeForExport = (obj) => {
+const sanitizeForExport = (obj, debugMode = false) => {
   if (!obj || typeof obj !== 'object') return obj;
   
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeForExport(item));
+    return obj.map(item => sanitizeForExport(item, debugMode));
   }
   
   const cleaned = {};
   for (const [key, value] of Object.entries(obj)) {
-    // Remove internal fields
+    // Remove internal/metadata fields
     if (key === '@search_pointer' || 
         key === 'search_pointer' || 
         key.endsWith('_md5') || 
@@ -125,8 +125,25 @@ const sanitizeForExport = (obj) => {
       continue;
     }
     
+    // Remove quota/QPS fields unless debug mode is enabled
+    if (!debugMode && (
+        key === 'quota_allotted' ||
+        key === 'quota_current' ||
+        key === 'quota_reset' ||
+        key === 'qps_allotted' ||
+        key === 'qps_current' ||
+        key.includes('quota') ||
+        key.includes('qps'))) {
+      continue;
+    }
+    
+    // Remove endpoint reference
+    if (key === 'endpoint') {
+      continue;
+    }
+    
     if (value && typeof value === 'object') {
-      cleaned[key] = sanitizeForExport(value);
+      cleaned[key] = sanitizeForExport(value, debugMode);
     } else {
       cleaned[key] = value;
     }
@@ -262,10 +279,9 @@ export const exportToDOC = async (data, filename, apiName, phoneNumber = '') => 
       },
       body: JSON.stringify({
         data: responseData.data,
-        apiName: apiName || 'NUFI Report',
+        apiName: apiName || 'Enrichment Report',
         phoneNumber: phoneNumber,
-        metadata: responseData.metadata || {},
-        filename: filename
+        metadata: responseData.metadata || {}
       })
     });
 
@@ -277,10 +293,15 @@ export const exportToDOC = async (data, filename, apiName, phoneNumber = '') => 
     // Get the blob from response
     const blob = await response.blob();
     
-    // Generate filename
-    const timestamp = new Date().toISOString().split('T')[0];
-    const phone = phoneNumber ? `_${phoneNumber}` : '';
-    const docFilename = `${filename || 'NUFI_Report'}_${apiName}${phone}_${timestamp}.docx`;
+    // Extract filename from Content-Disposition header if present
+    let docFilename = 'Enrichment_Report.docx';
+    const contentDisposition = response.headers.get('Content-Disposition');
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch && filenameMatch[1]) {
+        docFilename = filenameMatch[1];
+      }
+    }
 
     // Download the file
     const url = URL.createObjectURL(blob);

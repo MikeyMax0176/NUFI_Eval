@@ -1,7 +1,7 @@
 {
-  "name": "guardian-fusion",
+  "name": "mx-enrichment",
   "version": "1.0.0",
-  "description": "Guardian Fusion - Data Intelligence Platform for NUFI API",
+  "description": "MX Enrichment - Data Intelligence Platform for NUFI API",
   "scripts": {
     "install-all": "npm install && cd client && npm install && cd ../server && npm install",
     "dev": "concurrently \"npm run server\" \"npm run client\"",

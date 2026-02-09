@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { exportToCSV, exportToJSON, exportToDOC } from '../utils/exportUtils';
 import JsonDetailsRenderer from './JsonDetailsRenderer';
 
 function ResultsPanel({ results, error, loading, selectedApi }) {
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'json'
 
   if (loading) {
     return (
       <div className="results-panel">
         <div className="loading">
           <div className="loading-spinner"></div>
-          <p>Querying NUFI API...</p>
+          <p>Querying API...</p>
         </div>
       </div>
     );
@@ -48,7 +47,7 @@ function ResultsPanel({ results, error, loading, selectedApi }) {
       enrichmentByName: 'Enrichment_Name',
       renapo: 'Renapo_CURP'
     };
-    const apiName = apiNameMap[selectedApi] || 'NUFI';
+    const apiName = apiNameMap[selectedApi] || 'Enrichment';
     
     // Extract the search value (phone, email, or name) for the filename
     let searchIdentifier = '';
@@ -138,29 +137,7 @@ function ResultsPanel({ results, error, loading, selectedApi }) {
         <h2 className="section-title" style={{ margin: 0, border: 'none', padding: 0 }}>
           Results
         </h2>
-        <div className="view-toggle">
-          <button
-            className={viewMode === 'table' ? 'active' : ''}
-            onClick={() => setViewMode('table')}
-          >
-            Table
-          </button>
-          <button
-            className={viewMode === 'json' ? 'active' : ''}
-            onClick={() => setViewMode('json')}
-          >
-            JSON
-          </button>
-        </div>
       </div>
-
-      {results.metadata && (
-        <div className="metadata">
-          <strong>Query Info:</strong> {results.metadata.endpoint} API | 
-          Parameters: {results.metadata.paramsUsed.join(', ')} | 
-          Timestamp: {new Date(results.metadata.timestamp).toLocaleString()}
-        </div>
-      )}
 
       <div className="export-buttons">
         <button className="btn-export" onClick={() => handleExport('csv')}>
@@ -177,20 +154,7 @@ function ResultsPanel({ results, error, loading, selectedApi }) {
         </button>
       </div>
 
-      {viewMode === 'table' ? (
-        <JsonDetailsRenderer data={results} />
-      ) : (
-        <JsonView data={results} />
-      )}
-    </div>
-  );
-}
-
-// JSON view component - Raw JSON display
-function JsonView({ data }) {
-  return (
-    <div className="json-view">
-      <pre>{JSON.stringify(data, null, 2)}</pre>
+      <JsonDetailsRenderer data={results} />
     </div>
   );
 }

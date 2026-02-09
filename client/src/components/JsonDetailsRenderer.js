@@ -94,23 +94,35 @@ const formatKey = (key) => {
     .join(' ');
 };
 
+// Utility: Format date to mm/dd/yyyy
+const formatDate = (dateValue) => {
+  if (!dateValue) return 'N/A';
+  try {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return 'N/A';
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+  } catch {
+    return 'N/A';
+  }
+};
+
 // Utility: Format display value
 const formatDisplayValue = (value, keyName) => {
   if (!value) return 'N/A';
+  
+  // Handle date fields FIRST (before checking type)
+  if (keyName && (keyName.includes('date') || keyName.includes('since') || keyName.includes('seen'))) {
+    return formatDate(value);
+  }
   
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
   }
   
   if (typeof value === 'object') {
-    // Handle date fields
-    if (keyName && (keyName.includes('date') || keyName.includes('since') || keyName.includes('seen'))) {
-      try {
-        return new Date(value).toLocaleDateString();
-      } catch {
-        return JSON.stringify(value);
-      }
-    }
     
     // Handle objects with display properties
     if (value.display) return value.display;
@@ -212,15 +224,11 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* Primary Contact Info */}
       <div className="dossier-section">
-        <div className="dossier-row">
+        <div className="summaryGrid">
           <span className="dossier-label">📱 Phone</span>
           <span className="dossier-value">{primaryPhone}</span>
-        </div>
-        <div className="dossier-row">
           <span className="dossier-label">📧 Email</span>
           <span className="dossier-value">{primaryEmail}</span>
-        </div>
-        <div className="dossier-row">
           <span className="dossier-label">📍 Location</span>
           <span className="dossier-value">{primaryAddress}</span>
         </div>
@@ -228,7 +236,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All Names */}
       {dossier.names.length > 0 && (
-        <div className="dossier-section">
+        <div className="dossier-section report-section-block">
           <div className="dossier-section-title">👤 Names</div>
           <ExpandableTable
             items={dossier.names}
@@ -245,7 +253,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All Phones */}
       {dossier.phones.length > 0 && (
-        <div className="dossier-section">
+        <div className="dossier-section report-section-block">
           <div className="dossier-section-title">📞 Phone Numbers</div>
           <ExpandableTable
             items={dossier.phones}
@@ -266,7 +274,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All Emails */}
       {dossier.emails.length > 0 && (
-        <div className="dossier-section">
+        <div className="dossier-section report-section-block">
           <div className="dossier-section-title">📧 Email Addresses</div>
           <ExpandableTable
             items={dossier.emails}
@@ -284,7 +292,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All Addresses */}
       {dossier.addresses.length > 0 && (
-        <div className="dossier-section">
+        <div className="dossier-section report-section-block">
           <div className="dossier-section-title">📍 Addresses</div>
           <ExpandableTable
             items={dossier.addresses}
@@ -306,7 +314,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All Usernames */}
       {dossier.usernames.length > 0 && (
-        <div className="dossier-section">
+        <div className="dossier-section report-section-block">
           <div className="dossier-section-title">🔑 Usernames</div>
           <ExpandableTable
             items={dossier.usernames}
@@ -322,7 +330,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All User IDs */}
       {dossier.user_ids.length > 0 && (
-        <div className="dossier-section">
+        <div className="dossier-section report-section-block">
           <div className="dossier-section-title">🆔 User IDs</div>
           <ExpandableTable
             items={dossier.user_ids}
@@ -338,7 +346,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All URLs */}
       {dossier.urls.length > 0 && (
-        <div className="dossier-section">
+        <div className="dossier-section report-section-block">
           <div className="dossier-section-title">🔗 URLs</div>
           <ExpandableTable
             items={dossier.urls}
@@ -363,7 +371,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* Relationships */}
       {dossier.relationships.length > 0 && (
-        <div className="dossier-section">
+        <div className="dossier-section report-section-block">
           <div className="dossier-section-title">👥 Relationships</div>
           <ExpandableTable
             items={dossier.relationships}
@@ -379,7 +387,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* Personal Info */}
       {(dossier.gender || dossier.dob || dossier.languages.length > 0) && (
-        <div className="dossier-section">
+        <div className="dossier-section report-section-block">
           <div className="dossier-section-title">ℹ️ Personal Information</div>
           <div className="dossier-grid">
             {dossier.gender && (

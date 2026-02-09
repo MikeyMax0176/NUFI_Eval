@@ -31,7 +31,8 @@ const createNufiClient = () => {
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'NUFI-API-KEY': apiKey
+      'NUFI-API-KEY': apiKey,
+      'Ocp-Apim-Subscription-Key': apiKey // Azure APIM standard header
     },
     timeout: 30000 // 30 second timeout for slow responses
   });
@@ -71,6 +72,17 @@ const makeApiCall = async (endpoint, path, cleanParams, fallbackEndpoint) => {
       const mockResult = await generateMockResponse(fallbackEndpoint, cleanParams);
       mockResult.metadata.fallbackReason = `API unreachable: ${error.message}`;
       return mockResult;
+    }
+    
+    // Enhanced error logging for authentication issues
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      console.error(`[NUFI] Authentication Error (${error.response.status}):`);
+      console.error('  - API Key provided:', process.env.NUFI_API_KEY ? `${process.env.NUFI_API_KEY.substring(0, 8)}...` : 'MISSING');
+      console.error('  - Error details:', error.response?.data);
+      console.error('  - Possible causes:');
+      console.error('    1. API Key expirada o inválida');
+      console.error('    2. Suscripción no activa o límite de transacciones excedido');
+      console.error('    3. API Key no tiene permisos para este endpoint');
     }
     
     // For other errors, throw as before
