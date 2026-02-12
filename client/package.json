@@ -1,7 +1,7 @@
 {
-  "name": "mx-enrichment-client",
+  "name": "nufi-eval-client",
   "version": "1.0.0",
-  "description": "MX Enrichment Client - Data Intelligence Platform Interface",
+  "description": "Frontend GUI for NUFI API testing",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",

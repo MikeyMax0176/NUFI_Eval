@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { exportToCSV, exportToJSON, exportToDOC } from '../utils/exportUtils';
 import JsonDetailsRenderer from './JsonDetailsRenderer';
 
 function ResultsPanel({ results, error, loading, selectedApi }) {
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'json'
 
   if (loading) {
     return (
       <div className="results-panel">
         <div className="loading">
           <div className="loading-spinner"></div>
-          <p>Querying API...</p>
+          <p>Querying NUFI API...</p>
         </div>
       </div>
     );
@@ -45,81 +46,23 @@ function ResultsPanel({ results, error, loading, selectedApi }) {
       enrichmentByPhone: 'Enrichment_Phone',
       enrichmentByEmail: 'Enrichment_Email',
       enrichmentByName: 'Enrichment_Name',
-      renapo: 'Renapo_CURP'
+      profilingPhone: 'Profiling_Phone',
+      profilingEmail: 'Profiling_Email',
+      renapo: 'CURP_Name_Search'
     };
-    const apiName = apiNameMap[selectedApi] || 'Enrichment';
-    
-    // Extract the search value (phone, email, or name) for the filename
-    let searchIdentifier = '';
-    
-    // Try to get from query data first
-    if (results.data && results.data.query) {
-      // Check for phone numbers
-      if (results.data.query.phones && results.data.query.phones.length > 0) {
-        searchIdentifier = results.data.query.phones[0].number || results.data.query.phones[0].raw;
-      }
-      // Check for emails
-      else if (results.data.query.emails && results.data.query.emails.length > 0) {
-        searchIdentifier = results.data.query.emails[0].address || results.data.query.emails[0];
-      }
-      // Check for names
-      else if (results.data.query.names && results.data.query.names.length > 0) {
-        const name = results.data.query.names[0];
-        searchIdentifier = name.display || `${name.first || ''}_${name.last || ''}`.replace(/__/g, '_');
-      }
-      // Direct email or phone in query
-      else if (results.data.query.email) {
-        searchIdentifier = results.data.query.email;
-      }
-      else if (results.data.query.phone) {
-        searchIdentifier = results.data.query.phone;
-      }
-    }
-    
-    // Fallback: extract from top-level data fields
-    if (!searchIdentifier && results.data) {
-      searchIdentifier = results.data.phone || 
-                       results.data.telefono || 
-                       results.data.celular ||
-                       results.data.correo ||
-                       results.data.email ||
-                       results.data.curp ||
-                       results.data.rfc ||
-                       '';
-      
-      // Try to get name if nothing else found
-      if (!searchIdentifier && results.data.nombre) {
-        searchIdentifier = `${results.data.nombre || ''}_${results.data.apellidoPaterno || ''}`.replace(/__/g, '_');
-      }
-    }
-    
-    // Clean identifier for filename (remove special characters)
-    searchIdentifier = String(searchIdentifier)
-      .trim()
-      .replace(/[^a-zA-Z0-9@._-]/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_|_$/g, '');
-    
-    // Create filename: use search identifier as the main filename
-    const timestamp = new Date().toISOString().split('T')[0];
-    const filename = searchIdentifier || `${apiName}_${timestamp}`;
-
-    // Extract phone number for document metadata (if applicable)
-    let phoneNumber = '';
-    if (results.data && results.data.query && results.data.query.phones && results.data.query.phones.length > 0) {
-      phoneNumber = results.data.query.phones[0].number || results.data.query.phones[0].raw || '';
-      phoneNumber = phoneNumber.replace(/\D/g, '');
-    }
+    const apiName = apiNameMap[selectedApi] || 'NUFI';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const filename = `NUFI_${apiName}_${timestamp}`;
 
     switch (format) {
       case 'csv':
-        exportToCSV(results, filename);
+        exportToCSV(results, filename); // Now passing full results for comprehensive export
         break;
       case 'json':
         exportToJSON(results, filename);
         break;
       case 'doc':
-        exportToDOC(results, filename, apiName, phoneNumber);
+        exportToDOC(results, filename, apiName);
         break;
       default:
         break;
@@ -137,7 +80,29 @@ function ResultsPanel({ results, error, loading, selectedApi }) {
         <h2 className="section-title" style={{ margin: 0, border: 'none', padding: 0 }}>
           Results
         </h2>
+        <div className="view-toggle">
+          <button
+            className={viewMode === 'table' ? 'active' : ''}
+            onClick={() => setViewMode('table')}
+          >
+            Table
+          </button>
+          <button
+            className={viewMode === 'json' ? 'active' : ''}
+            onClick={() => setViewMode('json')}
+          >
+            JSON
+          </button>
+        </div>
       </div>
+
+      {results.metadata && (
+        <div className="metadata">
+          <strong>Query Info:</strong> {results.metadata.endpoint} API | 
+          Parameters: {results.metadata.paramsUsed.join(', ')} | 
+          Timestamp: {new Date(results.metadata.timestamp).toLocaleString()}
+        </div>
+      )}
 
       <div className="export-buttons">
         <button className="btn-export" onClick={() => handleExport('csv')}>
@@ -154,7 +119,20 @@ function ResultsPanel({ results, error, loading, selectedApi }) {
         </button>
       </div>
 
-      <JsonDetailsRenderer data={results} />
+      {viewMode === 'table' ? (
+        <JsonDetailsRenderer data={results} />
+      ) : (
+        <JsonView data={results} />
+      )}
+    </div>
+  );
+}
+
+// JSON view component - Raw JSON display
+function JsonView({ data }) {
+  return (
+    <div className="json-view">
+      <pre>{JSON.stringify(data, null, 2)}</pre>
     </div>
   );
 }

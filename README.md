@@ -1,6 +1,6 @@
 # NUFI API Testing GUI
 
-Internal tactical testing interface for the NUFI API. Built for local development and GitHub Codespaces with trial API keys.
+Internal tactical testing interface for the NUFI API. Built for local development and GitHub Codespaces with trial subscription keys.
 
 ## 🎯 Purpose
 
@@ -54,7 +54,10 @@ cp .env.example .env
 Edit `.env` and add your NUFI API key:
 
 ```env
-NUFI_API_KEY=your_actual_api_key_here
+NUFI_API_KEY=your_api_key_here
+
+# Optional explicit subscription key (defaults to NUFI_API_KEY)
+NUFI_SUBSCRIPTION_KEY=
 NUFI_API_BASE_URL=https://nufi.azure-api.net
 PORT=3001
 ```
@@ -159,9 +162,17 @@ Analyze and profile contact data based on phone number
 Analyze and profile contact data based on email address
 - `email` - Valid email address
 
-#### RENAPO - CURP Validation
-Obtain and validate CURP against Mexican national population registry
-- `curp` - Mexican unique citizen registry code to validate
+#### CURP Name Search
+Search CURP using personal data fields
+- `tipo_busqueda` - Search mode (use `datos`)
+- `clave_entidad` - Two-letter state code
+- `dia_nacimiento` - Birth day (DD)
+- `mes_nacimiento` - Birth month (MM)
+- `anio_nacimiento` - Birth year (YYYY)
+- `nombres` - First name(s)
+- `primer_apellido` - Paternal surname
+- `segundo_apellido` - Maternal surname (optional)
+- `sexo` - `H` for male, `M` for female
 
 ## 📊 Request Counter
 

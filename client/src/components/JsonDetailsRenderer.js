@@ -4,7 +4,7 @@ import './JsonDetailsRenderer.css';
 /**
  * JsonDetailsRenderer - Complete dossier view with comprehensive data display
  * Shows all names, phones, emails, addresses, usernames, user_ids, urls, relationships
- * Includes valid_since/last_seen dates
+ * Includes premium coverage counts and valid_since/last_seen dates
  * Renders as compact tables with expandable "View all" sections
  */
 
@@ -18,12 +18,7 @@ const sanitizeForDisplay = (obj) => {
   
   const cleaned = {};
   for (const [key, value] of Object.entries(obj)) {
-    // Remove search pointer, md5 hashes, and other internal fields
-    if (key === '@search_pointer' || 
-        key === 'search_pointer' || 
-        key.endsWith('_md5') || 
-        key === '@inferred' ||
-        key === '@id') {
+    if (key === '@search_pointer' || key.endsWith('_md5')) {
       continue;
     }
     
@@ -94,35 +89,23 @@ const formatKey = (key) => {
     .join(' ');
 };
 
-// Utility: Format date to mm/dd/yyyy
-const formatDate = (dateValue) => {
-  if (!dateValue) return 'N/A';
-  try {
-    const date = new Date(dateValue);
-    if (isNaN(date.getTime())) return 'N/A';
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${month}/${day}/${year}`;
-  } catch {
-    return 'N/A';
-  }
-};
-
 // Utility: Format display value
 const formatDisplayValue = (value, keyName) => {
   if (!value) return 'N/A';
-  
-  // Handle date fields FIRST (before checking type)
-  if (keyName && (keyName.includes('date') || keyName.includes('since') || keyName.includes('seen'))) {
-    return formatDate(value);
-  }
   
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
   }
   
   if (typeof value === 'object') {
+    // Handle date fields
+    if (keyName && (keyName.includes('date') || keyName.includes('since') || keyName.includes('seen'))) {
+      try {
+        return new Date(value).toLocaleDateString();
+      } catch {
+        return JSON.stringify(value);
+      }
+    }
     
     // Handle objects with display properties
     if (value.display) return value.display;
@@ -224,19 +207,38 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* Primary Contact Info */}
       <div className="dossier-section">
-        <div className="summaryGrid">
+        <div className="dossier-row">
           <span className="dossier-label">📱 Phone</span>
           <span className="dossier-value">{primaryPhone}</span>
+        </div>
+        <div className="dossier-row">
           <span className="dossier-label">📧 Email</span>
           <span className="dossier-value">{primaryEmail}</span>
+        </div>
+        <div className="dossier-row">
           <span className="dossier-label">📍 Location</span>
           <span className="dossier-value">{primaryAddress}</span>
         </div>
       </div>
 
+      {/* Premium Coverage */}
+      {premiumCounts.length > 0 && (
+        <div className="dossier-section">
+          <div className="dossier-section-title">💎 Premium Coverage</div>
+          <div className="dossier-grid">
+            {premiumCounts.map(([key, value]) => (
+              <div key={key} className="dossier-item">
+                <div className="dossier-item-label">{formatKey(key)}</div>
+                <div className="dossier-item-value">{formatDisplayValue(value)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* All Names */}
       {dossier.names.length > 0 && (
-        <div className="dossier-section report-section-block">
+        <div className="dossier-section">
           <div className="dossier-section-title">👤 Names</div>
           <ExpandableTable
             items={dossier.names}
@@ -253,7 +255,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All Phones */}
       {dossier.phones.length > 0 && (
-        <div className="dossier-section report-section-block">
+        <div className="dossier-section">
           <div className="dossier-section-title">📞 Phone Numbers</div>
           <ExpandableTable
             items={dossier.phones}
@@ -274,7 +276,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All Emails */}
       {dossier.emails.length > 0 && (
-        <div className="dossier-section report-section-block">
+        <div className="dossier-section">
           <div className="dossier-section-title">📧 Email Addresses</div>
           <ExpandableTable
             items={dossier.emails}
@@ -292,7 +294,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All Addresses */}
       {dossier.addresses.length > 0 && (
-        <div className="dossier-section report-section-block">
+        <div className="dossier-section">
           <div className="dossier-section-title">📍 Addresses</div>
           <ExpandableTable
             items={dossier.addresses}
@@ -314,7 +316,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All Usernames */}
       {dossier.usernames.length > 0 && (
-        <div className="dossier-section report-section-block">
+        <div className="dossier-section">
           <div className="dossier-section-title">🔑 Usernames</div>
           <ExpandableTable
             items={dossier.usernames}
@@ -330,7 +332,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All User IDs */}
       {dossier.user_ids.length > 0 && (
-        <div className="dossier-section report-section-block">
+        <div className="dossier-section">
           <div className="dossier-section-title">🆔 User IDs</div>
           <ExpandableTable
             items={dossier.user_ids}
@@ -346,7 +348,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* All URLs */}
       {dossier.urls.length > 0 && (
-        <div className="dossier-section report-section-block">
+        <div className="dossier-section">
           <div className="dossier-section-title">🔗 URLs</div>
           <ExpandableTable
             items={dossier.urls}
@@ -371,7 +373,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* Relationships */}
       {dossier.relationships.length > 0 && (
-        <div className="dossier-section report-section-block">
+        <div className="dossier-section">
           <div className="dossier-section-title">👥 Relationships</div>
           <ExpandableTable
             items={dossier.relationships}
@@ -387,7 +389,7 @@ function PersonInfoCompact({ person, availableData }) {
 
       {/* Personal Info */}
       {(dossier.gender || dossier.dob || dossier.languages.length > 0) && (
-        <div className="dossier-section report-section-block">
+        <div className="dossier-section">
           <div className="dossier-section-title">ℹ️ Personal Information</div>
           <div className="dossier-grid">
             {dossier.gender && (
@@ -502,6 +504,56 @@ function PersonInfoCompact({ person, availableData }) {
   );
 }
 
+// Component: Simple data view for demo mode (no person object)
+function SimpleDemoView({ data }) {
+  const rows = [];
+  
+  // Extract key-value pairs from the data
+  for (const [key, value] of Object.entries(data)) {
+    if (key === 'success' || key === 'metadata') continue;
+    
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      // Nested object like socialNetworks
+      for (const [subKey, subValue] of Object.entries(value)) {
+        rows.push({ label: `${formatKey(key)} - ${formatKey(subKey)}`, value: subValue });
+      }
+    } else if (Array.isArray(value)) {
+      // Arrays like alternativePhones
+      rows.push({ label: formatKey(key), value: value.join(', ') });
+    } else {
+      rows.push({ label: formatKey(key), value });
+    }
+  }
+
+  return (
+    <div className="dossier-card">
+      <div className="dossier-header">
+        <div className="dossier-title">
+          <h2>{data.name || 'Search Results'}</h2>
+        </div>
+      </div>
+      <div className="dossier-section">
+        <table className="dossier-table">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr key={idx}>
+                <td><strong>{row.label}</strong></td>
+                <td>{formatDisplayValue(row.value, row.label)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // Main JsonDetailsRenderer wrapper
 function JsonDetailsRenderer({ data }) {
   if (!data || typeof data !== 'object') {
@@ -513,7 +565,12 @@ function JsonDetailsRenderer({ data }) {
   const person = nufiData.person || cleanData.person;
   const availableData = nufiData.available_data || cleanData.available_data;
 
+  // If no person object, check if we have simple demo mode data
   if (!person) {
+    // Check if we have demo mode data (flat structure)
+    if (nufiData && typeof nufiData === 'object' && !Array.isArray(nufiData) && Object.keys(nufiData).length > 0) {
+      return <SimpleDemoView data={nufiData} />;
+    }
     return <div className="no-data">No person data found</div>;
   }
 

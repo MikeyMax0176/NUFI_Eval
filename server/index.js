@@ -1,91 +1,41 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const express = require('express');
-const session = require('express-session');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const nufiRoutes = require('./routes/nufi');
-const exportRoutes = require('./routes/export');
 const { requestCounter } = require('./middleware/requestCounter');
-const { initializeUsers, requireAuth, login, logout, checkSession } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const isProduction = NODE_ENV === 'production';
 
-// Trust proxy for rate limiting
-app.set('trust proxy', 1);
-
-// Initialize users from environment
-initializeUsers();
-
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: false, // Disable for API server
-  crossOriginEmbedderPolicy: false
-}));
-
-// CORS configuration
-const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
-  credentials: true, // Allow cookies for session
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
-
-// Session configuration
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'change-this-secret-in-production',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: isProduction, // HTTPS only in production
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: isProduction ? 'strict' : 'lax'
-  }
-}));
-
-// Rate limiting
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isProduction ? 100 : 1000, // Limit requests per window
-  message: { error: 'Too many requests, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-app.use(express.json({ limit: '50mb' })); // Increase limit for large data exports
+// Middleware
+app.use(cors());
+app.use(express.json());
 app.use(requestCounter);
 
-// Public routes (no authentication required)
-app.post('/api/auth/login', login);
-app.post('/api/auth/logout', logout);
-app.get('/api/auth/session', checkSession);
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Routes
+app.use('/api/nufi', nufiRoutes);
 
 // Root route
 app.get('/', (req, res) => {
   res.json({
-    name: 'MX Enrichment API Server',
+    name: 'Guardian Fusion API Server',
     status: 'running',
-    environment: NODE_ENV,
     endpoints: {
       health: '/api/health',
       stats: '/api/stats',
-      auth: '/api/auth/login'
+      evaluate: '/api/nufi/evaluate'
     }
   });
 });
 
-// Protected routes (authentication required)
-app.use('/api/nufi', apiLimiter, requireAuth, nufiRoutes);
-app.use('/api/export', apiLimiter, requireAuth, exportRoutes);
-app.get('/api/stats', requireAuth, (req, res) => {
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Request counter endpoint
+app.get('/api/stats', (req, res) => {
   const stats = require('./middleware/requestCounter').getStats();
   res.json(stats);
 });
@@ -101,6 +51,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 MX Enrichment Server running on port ${PORT}`);
+  console.log(`🚀 Guardian Fusion Server running on port ${PORT}`);
   console.log(`📊 API Stats available at http://localhost:${PORT}/api/stats`);
 });

@@ -1,10 +1,12 @@
 body {
   margin: 0;
-  font-family: 'Aptos', 'Segoe UI', 'Calibri', 'Helvetica Neue', sans-serif;
+  font-family: 'Aptos', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 code {
-  font-family: 'Consolas', 'Courier New', monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
 }

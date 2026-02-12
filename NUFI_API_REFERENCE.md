@@ -6,13 +6,14 @@
 
 **Authentication Header**:
 ```
-NUFI-API-KEY: your_api_key_here
+Ocp-Apim-Subscription-Key: your_api_key_here
 ```
 
 **Request Headers**:
 ```
 Accept: application/json
 Content-Type: application/json
+Ocp-Apim-Subscription-Key: {your_api_key}
 NUFI-API-KEY: {your_api_key}
 ```
 
@@ -271,13 +272,21 @@ NUFI-API-KEY: {your_api_key}
 }
 ```
 
-### 7. RENAPO CURP Validation
-**Endpoint**: `POST /renapo/v1/validacion`
+### 7. CURP Name Search
+**Endpoint**: `POST /curp/v1/consulta`
 
 **Request Body**:
 ```json
 {
-  "curp": "XXXX000000XXXXXX00"
+  "tipo_busqueda": "datos",
+  "clave_entidad": "MN",
+  "dia_nacimiento": "07",
+  "mes_nacimiento": "01",
+  "anio_nacimiento": "1950",
+  "nombres": "ALBERTO",
+  "primer_apellido": "AGUILERA",
+  "segundo_apellido": "VALADEZ",
+  "sexo": "H"
 }
 ```
 

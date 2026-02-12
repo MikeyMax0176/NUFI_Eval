@@ -22,13 +22,12 @@ const generateMockResponse = (endpoint, params) => {
       
       switch(endpoint) {
         case 'enrichment-phone':
-          const phoneHash = hashString(params.telefono || params.phone || '');
+          const phoneValue = params.phone || params.telefono || '';
+          const phoneHash = hashString(phoneValue);
           const firstNames = ['Juan', 'María', 'Carlos', 'Ana', 'Luis', 'Carmen', 'José', 'Laura', 'Miguel', 'Rosa', 'Pedro', 'Elena', 'Antonio', 'Isabel', 'Francisco'];
           const lastNames = ['García', 'Hernández', 'Rodríguez', 'Martínez', 'Sánchez', 'López', 'González', 'Pérez', 'Fernández', 'Torres', 'Ramírez', 'Flores', 'Rivera', 'Gómez', 'Díaz'];
           const secondLastNames = ['López', 'Pérez', 'Martínez', 'Gómez', 'Torres', 'Silva', 'Cruz', 'Reyes', 'Morales', 'Ortiz', 'Vargas', 'Castro', 'Ramos', 'Méndez', 'Ruiz'];
-          const locations = ['MX', 'MX', 'MX', 'MX', 'US', 'US'];
-          const cities = ['Ciudad de México', 'Guadalajara', 'Monterrey', 'Puebla', 'Querétaro', 'León', 'Toluca', 'Tijuana', 'Mérida', 'Cancún'];
-          const states = ['CDMX', 'JAL', 'NL', 'PUE', 'QRO', 'GTO', 'MEX', 'BC', 'YUC', 'QR'];
+          const locations = ['Ciudad de México, CDMX', 'Guadalajara, JAL', 'Monterrey, NL', 'Puebla, PUE', 'Querétaro, QRO', 'León, GTO', 'Toluca, MEX', 'Tijuana, BC', 'Mérida, YUC', 'Cancún, QR'];
           const carriers = ['Telcel', 'Movistar', 'AT&T', 'Virgin Mobile', 'Unefon'];
           const domains = ['gmail.com', 'hotmail.com', 'yahoo.com.mx', 'outlook.com', 'icloud.com', 'prodigy.net.mx'];
           
@@ -36,86 +35,23 @@ const generateMockResponse = (endpoint, params) => {
           const selectedLastName = lastNames[(phoneHash * 3) % lastNames.length];
           const selectedSecondLastName = secondLastNames[(phoneHash * 7) % secondLastNames.length];
           const fullName = `${selectedFirstName} ${selectedLastName} ${selectedSecondLastName}`;
-          const phoneNumber = (params.telefono || params.phone || '').replace(/[^0-9]/g, '');
-          const countryCode = phoneNumber.startsWith('52') ? 52 : 1;
-          const rawNumber = phoneNumber.startsWith('52') ? phoneNumber.substring(2) : phoneNumber;
           
-          // Match real NUFI API response structure
           mockData = {
-            status: 'success',
-            message: 'ok!',
-            data: {
-              query: {
-                phones: [{
-                  country_code: countryCode,
-                  number: parseInt(rawNumber) || 0,
-                  display: rawNumber.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3'),
-                  display_international: `+${countryCode} ${rawNumber.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3')}`
-                }]
-              },
-              person: {
-                '@id': `mock-${phoneHash}`,
-                '@match': 1,
-                '@search_pointer': `ptr_${phoneHash}_${Date.now()}`,
-                names: [{
-                  '@valid_since': '2024-01-01',
-                  '@last_seen': new Date().toISOString().split('T')[0],
-                  first: selectedFirstName,
-                  middle: '',
-                  last: `${selectedLastName} ${selectedSecondLastName}`,
-                  display: fullName
-                }],
-                phones: [{
-                  '@valid_since': '2024-01-01',
-                  '@last_seen': new Date().toISOString().split('T')[0],
-                  country_code: countryCode,
-                  number: parseInt(rawNumber) || 0,
-                  display: rawNumber.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3'),
-                  display_international: `+${countryCode} ${rawNumber.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3')}`,
-                  '@type': 'mobile',
-                  carrier: carriers[phoneHash % carriers.length]
-                }],
-                emails: [{
-                  '@valid_since': '2024-01-01',
-                  address: `${selectedFirstName.toLowerCase()}.${selectedLastName.toLowerCase()}${phoneHash % 999}@${domains[phoneHash % domains.length]}`,
-                  display: `${selectedFirstName.toLowerCase()}.${selectedLastName.toLowerCase()}${phoneHash % 999}@${domains[phoneHash % domains.length]}`
-                }],
-                addresses: [{
-                  '@valid_since': '2024-01-01',
-                  country: locations[phoneHash % locations.length],
-                  state: states[phoneHash % states.length],
-                  city: cities[phoneHash % cities.length],
-                  display: `${cities[phoneHash % cities.length]}, ${states[phoneHash % states.length]}, ${locations[phoneHash % locations.length]}`
-                }],
-                gender: {
-                  content: phoneHash % 2 === 0 ? 'male' : 'female'
-                },
-                languages: [{
-                  '@inferred': true,
-                  language: 'es',
-                  display: 'Spanish'
-                }]
-              },
-              available_data: {
-                premium: {
-                  addresses: 1,
-                  phones: 1,
-                  emails: 1,
-                  names: 1,
-                  genders: 1,
-                  languages: 1
-                }
-              },
-              '@persons_count': 1,
-              '@search_id': `${Date.now()}${phoneHash}`,
-              top_match: true,
-              QuotaAllotted: 1250,
-              QuotaCurrent: 43 + (phoneHash % 10),
-              QuotaReset: '2026-03-01T00:00:00+00:00',
-              QpsAllotted: 20,
-              QpsCurrent: 1
+            phone: phoneValue,
+            name: fullName,
+            email: `${selectedFirstName.toLowerCase()}.${selectedLastName.toLowerCase()}${phoneHash % 999}@${domains[phoneHash % domains.length]}`,
+            alternativePhones: [
+              `+5255${10000000 + (phoneHash % 90000000)}`,
+              `+5233${10000000 + ((phoneHash * 7) % 90000000)}`
+            ],
+            socialNetworks: {
+              facebook: `https://facebook.com/${selectedFirstName.toLowerCase()}.${selectedLastName.toLowerCase()}.${phoneHash % 999}`,
+              linkedin: `https://linkedin.com/in/${selectedFirstName.toLowerCase()}-${selectedLastName.toLowerCase()}-${phoneHash % 9999}`,
+              twitter: `@${selectedFirstName.toLowerCase()}${selectedLastName.toLowerCase().substring(0, 3)}${phoneHash % 999}`
             },
-            code: 200
+            location: locations[phoneHash % locations.length],
+            carrier: carriers[phoneHash % carriers.length],
+            lineType: phoneHash % 3 === 0 ? 'Mobile' : phoneHash % 3 === 1 ? 'Mobile' : 'Landline'
           };
           break;
           
@@ -218,27 +154,52 @@ const generateMockResponse = (endpoint, params) => {
           break;
           
         case 'renapo-curp':
-          const curpHash = hashString(params.curp || '');
+          const curpHash = hashString((params.nombres || '') + (params.primer_apellido || ''));
           const renapoGenders = ['HOMBRE', 'MUJER'];
-          const renapoBirthStates = ['CIUDAD DE MEXICO', 'JALISCO', 'NUEVO LEON', 'PUEBLA', 'QUERETARO', 'GUANAJUATO', 'MEXICO'];
-          const renapoFirstNames = ['JUAN', 'MARIA', 'CARLOS', 'ANA', 'LUIS', 'LAURA', 'PEDRO', 'SOFIA'];
-          const renapoPaternalSurnames = ['GARCIA', 'HERNANDEZ', 'RODRIGUEZ', 'MARTINEZ', 'LOPEZ', 'GONZALEZ', 'SANCHEZ'];
-          const renapoMaternalSurnames = ['LOPEZ', 'PEREZ', 'SILVA', 'CRUZ', 'GOMEZ', 'TORRES', 'REYES'];
-          
+          const renapoBirthStates = ['MICHOACAN DE OCAMPO', 'CIUDAD DE MEXICO', 'JALISCO', 'NUEVO LEON', 'PUEBLA', 'QUERETARO'];
+          const renapoFirstNames = ['ALBERTO', 'JUAN', 'MARIA', 'CARLOS', 'ANA', 'LUIS', 'LAURA', 'PEDRO', 'SOFIA'];
+          const renapoPaternalSurnames = ['AGUILERA', 'GARCIA', 'HERNANDEZ', 'RODRIGUEZ', 'MARTINEZ', 'LOPEZ', 'GONZALEZ', 'SANCHEZ'];
+          const renapoMaternalSurnames = ['VALADEZ', 'LOPEZ', 'PEREZ', 'SILVA', 'CRUZ', 'GOMEZ', 'TORRES', 'REYES'];
+          const curpValue = `AUVA${params.anio_nacimiento || '1950'}${params.mes_nacimiento || '01'}${params.dia_nacimiento || '07'}HMNGLL${String(curpHash % 10)}`;
+
           mockData = {
-            curp: params.curp,
-            isValid: curpHash % 10 > 1,
-            registeredInRENAPO: curpHash % 10 > 2,
-            personalInfo: {
-              name: renapoFirstNames[curpHash % renapoFirstNames.length],
-              paternalSurname: renapoPaternalSurnames[curpHash % renapoPaternalSurnames.length],
-              maternalSurname: renapoMaternalSurnames[(curpHash * 3) % renapoMaternalSurnames.length],
-              birthDate: `19${60 + (curpHash % 40)}-${String((curpHash % 12) + 1).padStart(2, '0')}-${String((curpHash % 28) + 1).padStart(2, '0')}`,
-              birthState: renapoBirthStates[curpHash % renapoBirthStates.length],
-              gender: renapoGenders[curpHash % renapoGenders.length]
-            },
-            validationDate: timestamp,
-            status: curpHash % 10 > 2 ? 'ACTIVO' : 'INACTIVO'
+            status: 'success',
+            message: 'resolve!',
+            data: {
+              curpdata: [
+                {
+                  gdata: `03AFY_a8V${curpHash}mocktoken`,
+                  parametro: `?curp=${curpValue}&pcurp=${curpHash}&hash=${curpHash}`,
+                  fechaNacimiento: `${params.dia_nacimiento || '07'}/${params.mes_nacimiento || '01'}/${params.anio_nacimiento || '1950'}`,
+                  docProbatorio: 1,
+                  segundoApellido: params.segundo_apellido || renapoMaternalSurnames[curpHash % renapoMaternalSurnames.length],
+                  curp: curpValue,
+                  nombres: params.nombres || renapoFirstNames[curpHash % renapoFirstNames.length],
+                  primerApellido: params.primer_apellido || renapoPaternalSurnames[curpHash % renapoPaternalSurnames.length],
+                  sexo: params.sexo === 'M' ? 'MUJER' : 'HOMBRE',
+                  claveEntidad: params.clave_entidad || 'MN',
+                  statusCurp: 'RCN',
+                  nacionalidad: 'MEXICO',
+                  entidad: renapoBirthStates[curpHash % renapoBirthStates.length],
+                  datosDocProbatorio: {
+                    entidadRegistro: 'MICHOACAN',
+                    tomo: '',
+                    claveMunicipioRegistro: '064',
+                    anioReg: params.anio_nacimiento || '1950',
+                    claveEntidadRegistro: '16',
+                    foja: '',
+                    numActa: '00015',
+                    libro: '',
+                    municipioRegistro: ''
+                  },
+                  descriptionStatusCurp: 'Registro de cambio no afectando a curp'
+                }
+              ],
+              files: [
+                'JVBERi0xLjQKJeLjz9MKMyAwIG9iago8PC9Db2xvclNwYWNlL0RldmljZVJHQi9TdWJ0eXBlL0ltYWdlL0hlaWdodCA0NTAvRmlsdGVyL0RDVERlY29kZS9UeXBlL1hPYmplY3QvV2lkdGggOTUwL0JpdHNQZXJDb2'
+              ],
+              guid: `mock-${curpHash}`
+            }
           };
           break;
           
@@ -295,69 +256,6 @@ const generateMockResponse = (endpoint, params) => {
               additionalInfo: 'Possible public official or politically exposed person'
             } : null
           };
-          break;
-          
-        case 'curp-calculation':
-          const curpCalcHash = hashString((params.nombres || '') + (params.primer_apellido || '') + (params.anio_nacimiento || ''));
-          const genderMap = { 'H': 'HOMBRE', 'M': 'MUJER' };
-          const stateNames = {
-            'AS': 'AGUASCALIENTES', 'BC': 'BAJA CALIFORNIA', 'BS': 'BAJA CALIFORNIA SUR',
-            'CC': 'CAMPECHE', 'CL': 'COAHUILA', 'CM': 'COLIMA', 'CS': 'CHIAPAS', 'CH': 'CHIHUAHUA',
-            'DF': 'CIUDAD DE MEXICO', 'DG': 'DURANGO', 'GT': 'GUANAJUATO', 'GR': 'GUERRERO',
-            'HG': 'HIDALGO', 'JC': 'JALISCO', 'MC': 'MEXICO', 'MN': 'MICHOACAN', 'MS': 'MORELOS',
-            'NT': 'NAYARIT', 'NL': 'NUEVO LEON', 'OC': 'OAXACA', 'PL': 'PUEBLA', 'QT': 'QUERETARO',
-            'QR': 'QUINTANA ROO', 'SP': 'SAN LUIS POTOSI', 'SL': 'SINALOA', 'SR': 'SONORA',
-            'TC': 'TABASCO', 'TS': 'TAMAULIPAS', 'TL': 'TLAXCALA', 'VZ': 'VERACRUZ',
-            'YN': 'YUCATAN', 'ZS': 'ZACATECAS', 'NE': 'NACIDO EN EL EXTRANJERO'
-          };
-          
-          // Generate CURP if tipo_busqueda is "datos"
-          if (params.tipo_busqueda === 'datos') {
-            const firstLetter = (params.primer_apellido || 'X').charAt(0);
-            const firstVowel = ((params.primer_apellido || 'X').match(/[AEIOU]/i) || ['X'])[0];
-            const secondInitial = (params.segundo_apellido || 'X').charAt(0);
-            const nameInitial = (params.nombres || 'X').charAt(0);
-            const year = (params.anio_nacimiento || '1990').slice(-2);
-            const month = (params.mes_nacimiento || '01').padStart(2, '0');
-            const day = (params.dia_nacimiento || '01').padStart(2, '0');
-            const gender = params.sexo || 'H';
-            const state = params.clave_entidad || 'NE';
-            const consonants = 'BCDFGHJKLMNPQRSTVWXYZ';
-            const randomConsonants = consonants[curpCalcHash % 20] + consonants[(curpCalcHash * 3) % 20] + consonants[(curpCalcHash * 7) % 20];
-            const checkDigit = curpCalcHash % 10;
-            
-            const calculatedCURP = `${firstLetter}${firstVowel}${secondInitial}${year}${month}${day}${gender}${state}${randomConsonants}${nameInitial}${checkDigit}`;
-            
-            mockData = {
-              curp: calculatedCURP.toUpperCase(),
-              status: 'success',
-              message: 'CURP calculado exitosamente',
-              data: {
-                nombres: (params.nombres || '').toUpperCase(),
-                primer_apellido: (params.primer_apellido || '').toUpperCase(),
-                segundo_apellido: (params.segundo_apellido || '').toUpperCase(),
-                fecha_nacimiento: `${params.anio_nacimiento}-${month}-${day}`,
-                sexo: genderMap[params.sexo] || 'NO ESPECIFICADO',
-                entidad_nacimiento: stateNames[params.clave_entidad] || 'DESCONOCIDO'
-              }
-            };
-          } else {
-            // Validate existing CURP
-            mockData = {
-              curp: params.curp,
-              isValid: params.curp && params.curp.length === 18,
-              status: 'success',
-              message: 'CURP validado',
-              data: {
-                nombres: 'ALBERTO',
-                primer_apellido: 'AGUILERA',
-                segundo_apellido: 'VALADEZ',
-                fecha_nacimiento: '1950-01-07',
-                sexo: 'HOMBRE',
-                entidad_nacimiento: 'MICHOACAN'
-              }
-            };
-          }
           break;
           
         default:

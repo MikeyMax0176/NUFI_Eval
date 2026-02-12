@@ -83,7 +83,7 @@
 │  │  • enrichmentByName() - /v1/enrichment/name endpoint         │  │
 │  │  • profilingPhone() - /v1/profiling/phone endpoint           │  │
 │  │  • profilingEmail() - /v1/profiling/email endpoint           │  │
-│  │  • renapo() - /v1/renapo/curp endpoint                       │  │
+│  │  • renapo() - /curp/v1/consulta endpoint                     │  │
 │  │  • Parameter cleaning & validation                           │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                                                                      │
@@ -303,7 +303,7 @@ App.js
 | POST /api/nufi/enrichment/name | nufi.js router | POST /v1/enrichment/name | Name-based data enrichment |
 | POST /api/nufi/profiling/phone | nufi.js router | POST /v1/profiling/phone | Contact profiling by phone |
 | POST /api/nufi/profiling/email | nufi.js router | POST /v1/profiling/email | Contact profiling by email |
-| POST /api/nufi/renapo/curp | nufi.js router | POST /v1/renapo/curp | CURP validation (RENAPO) |
+| POST /api/nufi/renapo/curp | nufi.js router | POST /curp/v1/consulta | CURP name search |
 | GET /api/stats | index.js | N/A | Usage statistics |
 | GET /api/health | index.js | N/A | Health check |
 

@@ -2,34 +2,191 @@
  * Export utilities for NUFI API results
  * Supports CSV, JSON, and DOC formats
  * 
- * CSV Export Strategy:
- * - Recursively flattens nested objects with dot notation (e.g., person.name)
- * - Arrays of objects: Creates multiple rows (one per array item)
- * - Arrays of primitives: Joins with semicolon separator
- * - Preserves all metadata including @-prefixed keys
+ * Export Strategy: Plain English, matching GUI display
+ * - Clean field names (Name, Email, Phone)
+ * - Human-readable format
+ * - Organized sections
  */
 
 /**
- * Flatten nested object for CSV export
- * Now handles deep nesting and creates multiple rows for arrays of objects
- * Removes internal fields like @search_pointer
+ * Extract person data in plain English format matching the GUI display
+ */
+const extractPersonData = (data) => {
+  const result = {};
+  
+  // Get the person object - handle triple nesting from NUFI API
+  const person = data?.data?.data?.person || data?.data?.person || data?.person;
+  const available_data = data?.data?.data?.available_data || data?.data?.available_data || data?.available_data;
+  const query = data?.data?.data?.query || data?.data?.query || data?.query;
+  const rawData = data?.data;
+  
+  // Handle demo mode simple format (no person object)
+  if (!person && rawData && !rawData.data && !rawData.person) {
+    if (rawData.name) result['Name'] = rawData.name;
+    if (rawData.phone) result['Phone'] = rawData.phone;
+    if (rawData.email) result['Email'] = rawData.email;
+    if (rawData.emailValid !== undefined) result['Email Valid'] = rawData.emailValid ? 'Yes' : 'No';
+    if (rawData.domain) result['Email Domain'] = rawData.domain;
+    if (rawData.companyName) result['Company'] = rawData.companyName;
+    if (rawData.location) result['Location'] = rawData.location;
+    if (rawData.carrier) result['Carrier'] = rawData.carrier;
+    if (rawData.lineType) result['Line Type'] = rawData.lineType;
+    if (rawData.alternativePhones && rawData.alternativePhones.length > 0) {
+      result['Alternative Phones'] = rawData.alternativePhones.join('; ');
+    }
+    if (rawData.socialNetworks) {
+      if (rawData.socialNetworks.linkedin) result['LinkedIn'] = rawData.socialNetworks.linkedin;
+      if (rawData.socialNetworks.twitter) result['Twitter'] = rawData.socialNetworks.twitter;
+      if (rawData.socialNetworks.facebook) result['Facebook'] = rawData.socialNetworks.facebook;
+    }
+  }
+  
+  // Basic Information (NUFI API format with person object)
+  if (person) {
+    // Name
+    const primaryName = person.names?.[0];
+    if (primaryName) {
+      result['Name'] = primaryName.display || `${primaryName.first || ''} ${primaryName.middle || ''} ${primaryName.last || ''}`.trim() || 'N/A';
+      if (primaryName['@type']) result['Name Type'] = primaryName['@type'];
+      if (primaryName['@valid_since']) result['Name Valid Since'] = primaryName['@valid_since'];
+    }
+    
+    // All Names (if multiple)
+    if (person.names && person.names.length > 1) {
+      result['All Names'] = person.names.map(n => n.display || `${n.first || ''} ${n.last || ''}`.trim()).join('; ');
+    }
+    
+    // Phone
+    const primaryPhone = person.phones?.[0];
+    if (primaryPhone) {
+      result['Phone'] = primaryPhone.display_international || primaryPhone.display || primaryPhone.number || 'N/A';
+      if (primaryPhone['@type']) result['Phone Type'] = primaryPhone['@type'];
+    }
+    
+    // All Phones (if multiple)
+    if (person.phones && person.phones.length > 1) {
+      result['All Phones'] = person.phones.map(p => p.display_international || p.display || p.number).filter(Boolean).join('; ');
+    }
+    
+    // Email
+    const primaryEmail = person.emails?.[0];
+    if (primaryEmail) {
+      result['Email'] = primaryEmail.address || primaryEmail.email || primaryEmail || 'N/A';
+      if (primaryEmail['@type']) result['Email Type'] = primaryEmail['@type'];
+    }
+    
+    // All Emails (if multiple)
+    if (person.emails && person.emails.length > 1) {
+      result['All Emails'] = person.emails.map(e => e.address || e.email || e).filter(Boolean).join('; ');
+    }
+    
+    // Address
+    const primaryAddress = person.addresses?.[0];
+    if (primaryAddress) {
+      result['Address'] = primaryAddress.display || `${primaryAddress.city || ''} ${primaryAddress.state || ''}`.trim() || 'N/A';
+      if (primaryAddress.city) result['City'] = primaryAddress.city;
+      if (primaryAddress.state) result['State'] = primaryAddress.state;
+      if (primaryAddress.country) result['Country'] = primaryAddress.country;
+      if (primaryAddress.zip_code) result['Zip Code'] = primaryAddress.zip_code;
+    }
+    
+    // Gender
+    if (person.gender?.content) {
+      result['Gender'] = person.gender.content;
+    }
+    
+    // Date of Birth
+    if (person.dob) {
+      result['Date of Birth'] = person.dob.display || person.dob;
+    }
+    
+    // Languages
+    if (person.languages && person.languages.length > 0) {
+      result['Languages'] = person.languages.map(l => l.display || l.language).filter(Boolean).join(', ');
+    }
+    
+    // Jobs
+    if (person.jobs && person.jobs.length > 0) {
+      result['Job Title'] = person.jobs[0].title || person.jobs[0].display || 'N/A';
+      if (person.jobs[0].organization) result['Organization'] = person.jobs[0].organization;
+    }
+    
+    // Education
+    if (person.educations && person.educations.length > 0) {
+      result['Education'] = person.educations[0].display || person.educations[0].school || 'N/A';
+    }
+    
+    // Usernames
+    if (person.usernames && person.usernames.length > 0) {
+      result['Usernames'] = person.usernames.map(u => u.content || u).filter(Boolean).join(', ');
+    }
+    
+    // URLs
+    if (person.urls && person.urls.length > 0) {
+      result['URLs'] = person.urls.map(u => u.url || u).filter(Boolean).join(', ');
+    }
+    
+    // Match Score
+    if (person['@match'] !== null && person['@match'] !== undefined) {
+      result['Match Score'] = `${Math.round(person['@match'] * 100)}%`;
+    }
+    
+    // Relationships
+    if (person.relationships && person.relationships.length > 0) {
+      const relationships = person.relationships.map(rel => {
+        const relName = rel.names?.[0]?.display || rel.name || 'Unknown';
+        const relType = rel['@type'] || rel.type || 'Relation';
+        return `${relName} (${relType})`;
+      });
+      result['Relationships'] = relationships.join('; ');
+    }
+  }
+  
+  // Query information (what was searched)
+  if (query) {
+    if (query.phones?.[0]) {
+      result['Searched Phone'] = query.phones[0].display_international || query.phones[0].display || query.phones[0].number;
+    }
+    if (query.emails?.[0]) {
+      result['Searched Email'] = query.emails[0].address || query.emails[0].email;
+    }
+    if (query.names?.[0]) {
+      result['Searched Name'] = query.names[0].display || query.names[0];
+    }
+  }
+  
+  // Premium data availability
+  if (available_data?.premium) {
+    const premium = available_data.premium;
+    const premiumFields = [];
+    if (premium.names) premiumFields.push(`Names (${premium.names})`);
+    if (premium.phones) premiumFields.push(`Phones (${premium.phones})`);
+    if (premium.emails) premiumFields.push(`Emails (${premium.emails})`);
+    if (premium.addresses) premiumFields.push(`Addresses (${premium.addresses})`);
+    if (premiumFields.length > 0) {
+      result['Premium Data Available'] = premiumFields.join(', ');
+    }
+  }
+  
+  // Metadata
+  const metadata = data?.metadata;
+  if (metadata) {
+    if (metadata.timestamp) result['Query Timestamp'] = new Date(metadata.timestamp).toLocaleString();
+    if (metadata.endpoint) result['API Endpoint'] = metadata.endpoint;
+  }
+  
+  return result;
+};
+
+/**
+ * Legacy flatten function for JSON structure (fallback)
  */
 const flattenObject = (obj, prefix = '') => {
   let result = {};
   
   for (const [key, value] of Object.entries(obj)) {
-    // Skip internal/metadata fields
-    if (key === '@search_pointer' || 
-        key === 'search_pointer' || 
-        key.endsWith('_md5') || 
-        key === '@inferred' ||
-        key === '@id' ||
-        key === 'metadata') {
-      continue;
-    }
-    
     if (value === null || value === undefined) {
-      continue; // Skip null/undefined but preserve empty strings
+      continue;
     }
 
     const newKey = prefix ? `${prefix}.${key}` : key;
@@ -38,14 +195,11 @@ const flattenObject = (obj, prefix = '') => {
       if (value.length === 0) {
         result[newKey] = '';
       } else if (typeof value[0] === 'object' && value[0] !== null) {
-        // Array of objects: join with semicolon, flatten each object
         result[newKey] = value.map(item => JSON.stringify(item)).join(' | ');
       } else {
-        // Array of primitives: join with semicolon
         result[newKey] = value.join('; ');
       }
     } else if (typeof value === 'object' && value !== null) {
-      // Nested object: recursively flatten
       Object.assign(result, flattenObject(value, newKey));
     } else {
       result[newKey] = value;
@@ -56,40 +210,25 @@ const flattenObject = (obj, prefix = '') => {
 };
 
 /**
- * Export results to CSV format
- * Now includes ALL fields from the response with clean formatting
+ * Export results to CSV format in plain English
+ * Matches what the GUI displays
  */
 export const exportToCSV = (data, filename) => {
   try {
-    // Sanitize then flatten the data
-    const sanitized = sanitizeForExport(data);
-    const flatData = flattenObject(sanitized);
+    // Extract data in human-readable format
+    const cleanData = extractPersonData(data);
     
-    if (Object.keys(flatData).length === 0) {
+    if (Object.keys(cleanData).length === 0) {
       alert('No data to export');
       return;
     }
 
-    // Create CSV content
-    const headers = Object.keys(flatData);
-    const values = Object.values(flatData);
-    
-    // Format column names - convert dot notation and clean up
-    const cleanHeaders = headers.map(h => {
-      return h
-        .replace(/@/g, '')  // Remove @ symbols
-        .replace(/\./g, '_') // Replace dots with underscores
-        .replace(/([A-Z])/g, '_$1') // Add underscore before capitals
-        .toLowerCase()
-        .replace(/_+/g, '_') // Remove multiple underscores
-        .replace(/^_|_$/g, '') // Remove leading/trailing underscores
-        .split('_')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-    });
+    // Create CSV content with clean column names
+    const headers = Object.keys(cleanData);
+    const values = Object.values(cleanData);
 
     const csvContent = [
-      cleanHeaders.join(','),
+      headers.join(','),
       values.map(v => {
         const str = String(v).replace(/"/g, '""'); // Escape quotes
         return `"${str}"`;
@@ -105,60 +244,11 @@ export const exportToCSV = (data, filename) => {
 };
 
 /**
- * Sanitize data for export - remove internal fields, vendor strings, and quota/QPS data
- */
-const sanitizeForExport = (obj, debugMode = false) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  
-  if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeForExport(item, debugMode));
-  }
-  
-  const cleaned = {};
-  for (const [key, value] of Object.entries(obj)) {
-    // Remove internal/metadata fields
-    if (key === '@search_pointer' || 
-        key === 'search_pointer' || 
-        key.endsWith('_md5') || 
-        key === '@inferred' ||
-        key === '@id') {
-      continue;
-    }
-    
-    // Remove quota/QPS fields unless debug mode is enabled
-    if (!debugMode && (
-        key === 'quota_allotted' ||
-        key === 'quota_current' ||
-        key === 'quota_reset' ||
-        key === 'qps_allotted' ||
-        key === 'qps_current' ||
-        key.includes('quota') ||
-        key.includes('qps'))) {
-      continue;
-    }
-    
-    // Remove endpoint reference
-    if (key === 'endpoint') {
-      continue;
-    }
-    
-    if (value && typeof value === 'object') {
-      cleaned[key] = sanitizeForExport(value, debugMode);
-    } else {
-      cleaned[key] = value;
-    }
-  }
-  
-  return cleaned;
-};
-
-/**
  * Export results to JSON format
  */
 export const exportToJSON = (data, filename) => {
   try {
-    const sanitized = sanitizeForExport(data);
-    const jsonContent = JSON.stringify(sanitized, null, 2);
+    const jsonContent = JSON.stringify(data, null, 2);
     downloadFile(jsonContent, `${filename}.json`, 'application/json');
   } catch (error) {
     console.error('JSON export error:', error);
@@ -167,156 +257,139 @@ export const exportToJSON = (data, filename) => {
 };
 
 /**
- * Format a value for clean display in the document
+ * Export results to DOC format (HTML-based Word-compatible document)
+ * Uses plain English labels matching the GUI
  */
-const formatValue = (value) => {
-  if (value === null || value === undefined) return '<em style="color: #999;">N/A</em>';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'string') return value || '<em style="color: #999;">Empty</em>';
-  if (typeof value === 'number') return value.toString();
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '<em style="color: #999;">Empty array</em>';
-    if (typeof value[0] === 'object' && value[0] !== null) {
-      // Array of objects - render each as a sub-section
-      return value.map((item, i) => `
-        <div style="margin-left: 20px; margin-top: 10px; padding: 10px; background: #fff; border-left: 3px solid #3498db;">
-          <strong>Item ${i + 1}:</strong><br/>
-          ${Object.entries(item).map(([k, v]) => 
-            `<div style="margin-left: 10px;"><strong>${k}:</strong> ${formatValue(v)}</div>`
-          ).join('')}
-        </div>
-      `).join('');
-    }
-    // Array of primitives
-    return value.join(', ');
-  }
-  if (typeof value === 'object') {
-    // Nested object - render inline
-    return `<div style="margin-left: 15px; margin-top: 5px;">${
-      Object.entries(value).map(([k, v]) => 
-        `<div><strong>${k}:</strong> ${formatValue(v)}</div>`
-      ).join('')
-    }</div>`;
-  }
-  return String(value);
-};
-
-/**
- * Render a nested object as clean HTML sections
- */
-const renderObjectSection = (obj, depth = 0) => {
-  if (!obj || typeof obj !== 'object') {
-    return `<p>No data available</p>`;
-  }
-  
-  let html = '';
-  const indent = depth > 0 ? 'margin-left: 20px;' : '';
-  
-  const entries = Object.entries(obj);
-  if (entries.length === 0) {
-    return '<p><em>No data available</em></p>';
-  }
-  
-  for (const [key, value] of entries) {
-    // Skip metadata and internal fields in the data section
-    if (key === 'metadata' || key.startsWith('@')) continue;
-    
-    const label = key
-      .replace(/([A-Z])/g, ' $1') // Add space before capitals
-      .replace(/[_-]/g, ' ') // Replace underscores/hyphens with spaces
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
-      .trim();
-    
-    if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 3) {
-      // Large nested object - create subsection
-      html += `
-        <div style="${indent}">
-          <h3 style="color: #2c3e50; font-size: 15px; margin-top: 15px; margin-bottom: 10px; border-bottom: 1px solid #e0e0e0; padding-bottom: 5px;">${label}</h3>
-          ${renderObjectSection(value, depth + 1)}
-        </div>`;
-    } else {
-      // Simple field or small object - show as key-value pair
-      const formattedValue = formatValue(value);
-      html += `
-        <div style="${indent} margin-bottom: 10px;">
-          <strong style="color: #2c3e50; display: inline-block; min-width: 150px;">${label}:</strong> 
-          <span style="color: #34495e;">${formattedValue}</span>
-        </div>`;
-    }
-  }
-  
-  return html || '<p><em>No data to display</em></p>';
-};
-
-/**
- * Export results to DOC format - Professional Word document
- * Now generates true .docx files with proper styling via server endpoint
- */
-export const exportToDOC = async (data, filename, apiName, phoneNumber = '') => {
+export const exportToDOC = (data, filename, apiName) => {
   try {
-    // Handle different data structures
-    let responseData;
-    if (data.data) {
-      responseData = data;
-    } else if (data.results) {
-      responseData = { data: data.results, metadata: data.metadata };
-    } else {
-      responseData = { data: data };
-    }
+    // Extract data in human-readable format
+    const cleanData = extractPersonData(data);
     
-    if (!responseData.data || (typeof responseData.data === 'object' && Object.keys(responseData.data).length === 0)) {
+    if (Object.keys(cleanData).length === 0) {
       alert('No data to export');
       return;
     }
 
-    // Call server endpoint to generate professional DOCX
-    const response = await fetch('/api/export/docx', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        data: responseData.data,
-        apiName: apiName || 'Enrichment Report',
-        phoneNumber: phoneNumber,
-        metadata: responseData.metadata || {}
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.details || error.error || 'Failed to generate document');
-    }
-
-    // Get the blob from response
-    const blob = await response.blob();
+    // Create HTML document structure
+    const timestamp = new Date().toLocaleString();
+    const metadata = data.metadata || {};
+    const person = data?.data?.person || data?.person;
     
-    // Extract filename from Content-Disposition header if present
-    let docFilename = 'Enrichment_Report.docx';
-    const contentDisposition = response.headers.get('Content-Disposition');
-    if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-      if (filenameMatch && filenameMatch[1]) {
-        docFilename = filenameMatch[1];
-      }
+    let docContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>NUFI API Report - ${apiName}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #2c3e50;
+      border-bottom: 3px solid #3498db;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #34495e;
+      margin-top: 25px;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+    .summary {
+      background-color: #ecf0f1;
+      padding: 20px;
+      border-left: 4px solid #3498db;
+      margin-bottom: 30px;
+    }
+    .summary h2 {
+      margin-top: 0;
+    }
+    .summary p {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      margin-bottom: 20px;
+    }
+    th, td {
+      border: 1px solid #bdc3c7;
+      padding: 12px;
+      text-align: left;
+    }
+    th {
+      background-color: #34495e;
+      color: white;
+      font-weight: bold;
+      width: 35%;
+    }
+    tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+    .footer {
+      margin-top: 40px;
+      font-size: 12px;
+      color: #7f8c8d;
+      border-top: 1px solid #bdc3c7;
+      padding-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h1>NUFI API Report: ${apiName}</h1>
+  
+  <div class="summary">
+    <h2>Report Summary</h2>
+    <p><strong>Generated:</strong> ${timestamp}</p>
+    ${metadata.endpoint ? `<p><strong>API Endpoint:</strong> ${metadata.endpoint}</p>` : ''}
+    ${metadata.paramsUsed ? `<p><strong>Search Parameters:</strong> ${metadata.paramsUsed.join(', ')}</p>` : ''}
+    ${person?.['@match'] ? `<p><strong>Match Confidence:</strong> ${Math.round(person['@match'] * 100)}%</p>` : ''}
+  </div>
+
+  <h2>Contact Information</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+`;
+
+    // Add data rows with clean field names
+    for (const [key, value] of Object.entries(cleanData)) {
+      // Skip metadata fields in the main table
+      if (key.includes('Timestamp') || key.includes('Endpoint')) continue;
+      
+      docContent += `
+      <tr>
+        <td><strong>${key}</strong></td>
+        <td>${String(value)}</td>
+      </tr>`;
     }
 
-    // Download the file
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = docFilename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    docContent += `
+    </tbody>
+  </table>
 
-    console.log(`Successfully exported ${docFilename}`);
+  <div class="footer">
+    <p>Report generated by NUFI API Testing Interface</p>
+    <p>This document is for internal evaluation and testing purposes only.</p>
+  </div>
+</body>
+</html>`;
+
+    // Download as .doc (HTML-based, opens in Word)
+    downloadFile(docContent, `${filename}.doc`, 'application/msword');
   } catch (error) {
     console.error('DOC export error:', error);
-    alert('Failed to export DOC: ' + error.message);
+    alert('Failed to export DOC');
   }
 };
 
